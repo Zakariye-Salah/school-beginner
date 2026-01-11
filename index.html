@@ -4,135 +4,117 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Alfatxi School — Results</title>
-  <link rel="stylesheet" href="style.css" />
   <style>
     :root{
-      --bg: #fbfdff;
-      --text: #0f172a;
-      --muted: #6b7280;
-      --card-shadow: 0 6px 18px rgba(15,23,42,0.04);
-      --primary: #0b74ff;
-      /* tiny size used for extremely compact mobile text — change to 5px if you really want it that tiny */
-      --tiny-size: 9px;
+      --bg:#fbfdff; --text:#0f172a; --muted:#6b7280; --card-shadow:0 6px 18px rgba(15,23,42,0.04);
+      --primary:#0b74ff; --btn-font:15px; --tiny-size:9px;
     }
-    html,body{height:100%}
-    body { font-family: Inter, system-ui, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
-    .container-max { max-width:900px; margin:18px auto; padding:14px; box-sizing:border-box; }
+    html,body{height:100%;margin:0}
+    body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+    .container { max-width:900px; margin:16px auto; padding:12px; box-sizing:border-box; }
 
-    h1{ font-size:1.25rem; margin:0 0 6px 0; line-height:1.12; }
-    p.lead{ margin:0 0 12px 0; color:var(--muted); font-size:0.95rem; }
+    h1{font-size:1.12rem;margin:0 0 6px 0}
+    p.lead{margin:0 0 10px 0;color:var(--muted);font-size:0.95rem}
 
-    .card { background:#fff; border-radius:10px; padding:14px; box-shadow:var(--card-shadow); margin-bottom:12px; box-sizing:border-box; }
-    .btn { cursor:pointer; border:1px solid rgba(11,116,255,0.15); background:#fff; padding:8px 12px; border-radius:8px; font-weight:600; font-size:0.95rem; }
-    .btn-primary { background:var(--primary); color:#fff; border-color:var(--primary); }
-    .btn-ghost { background:#fff; color:var(--text); border-color:#e6eefc; }
+    .card { background:#fff;border-radius:12px;padding:12px;box-shadow:var(--card-shadow);margin-bottom:12px;box-sizing:border-box }
+    .small-card{padding:10px}
+    .btn { display:inline-flex; align-items:center; gap:8px; border-radius:10px; padding:8px 12px; font-weight:700; border:1px solid rgba(11,116,255,0.12); background:#fff; cursor:pointer; font-size:var(--btn-font) }
+    .btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .btn-ghost{background:#fff;color:var(--text);border-color:#e6eefc}
+    .icon { width:18px; height:18px; display:inline-block; vertical-align:middle }
 
-    input#studentId { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box; }
-    .actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .input-row { display:flex; gap:8px; align-items:center }
+    input#studentId { flex:1; padding:10px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box }
 
-    /* result area table */
-    #resultArea table { width: 100%; border-collapse: collapse; font-family: inherit; table-layout:auto; }
-    #resultArea table th, #resultArea table td { padding: 8px 10px; text-align:center; vertical-align:middle; border-collapse:collapse; }
-    #resultArea table thead tr { background:#f8fafc; }
-    #resultArea table th:first-child, #resultArea table td:first-child { text-align:left; padding-left:10px; word-break:break-word; }
+    /* Result header */
+    .result-school { font-weight:900; font-size:1rem; margin-bottom:6px }
+    .result-header { display:flex; flex-direction:column; gap:6px; }
+    .header-top { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap }
+    .student-line { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
+    .student-name { font-size:1.18rem; font-weight:900; font-style:italic; transform:skewX(-2deg) }
 
-    /* header row (name + id on the same line) */
-    .result-header { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
-    .student-name { font-size:1.2rem; font-weight:800; }
-    .student-name.slanted { display:inline-block; transform:skewX(-3deg); font-style:italic; }
-    .student-meta { color:var(--muted); font-size:0.92rem; display:flex; gap:8px; align-items:center; }
+    .meta-inline { color:var(--muted); display:flex; gap:10px; align-items:center; font-weight:700; font-size:0.95rem }
+    .meta-inline .label { color:var(--muted); font-weight:700 }
 
-    /* totals line (inline) */
-    #totalsInline { margin-top:12px; display:flex; gap:14px; align-items:center; flex-wrap:nowrap; white-space:nowrap; font-weight:600; }
-    .tot-item { display:inline-block; margin-right:10px; font-size:0.95rem; }
-    .tiny { font-size: var(--tiny-size) !important; } /* super-compact helper */
+    /* Table */
+    #resultArea table { width:100%; border-collapse:collapse; font-family:inherit; }
+    #resultArea thead tr { background:#f8fafc }
+    #resultArea th, #resultArea td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    #resultArea th { font-weight:800; text-align:center; white-space:normal; } /* allow header wrapping - no dots */
+    #resultArea td { font-weight:700; text-align:center; }
+    #resultArea td:first-child, #resultArea th:first-child { text-align:left; font-weight:800; }
 
-    /* compact badges */
-    #gradeBadge { padding:4px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; color:#fff; display:inline-block; }
+    /* numeric columns compact and no-wrap */
+    #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; width:6ch; }
 
-    /* actions row: include screenshot icon and print */
-    .result-actions { margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    /* Totals layout (4 lines) */
+    .totals-card { margin-top:12px; padding:12px; border-radius:10px; }
+    .totals-block { display:flex; flex-direction:column; gap:6px; font-weight:800; }
+    .tot-line { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
 
-    /* small icons inside buttons */
-    .icon { width:18px; height:18px; display:inline-block; vertical-align:middle; margin-right:6px; }
+    .grade-badge { padding:6px 10px; border-radius:8px; color:#fff; font-weight:900; display:inline-block }
 
-    /* loader overlay centered */
-    #loaderOverlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1100; backdrop-filter: blur(3px); background: rgba(10,15,25,0.20); }
-    .loader-inner { background: rgba(255,255,255,0.98); padding: 14px 16px; border-radius: 12px; box-shadow: 0 12px 40px rgba(2,6,23,0.20); min-width:200px; max-width:90%; text-align:center; }
-    .dots-wrap { display:inline-block; position:relative; width:72px; height:40px; margin-bottom:8px; }
-    .dots { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; gap:8px; }
-    .dot { width:10px; height:10px; background:var(--primary); border-radius:50%; transform-origin:center; animation: jump 900ms ease-in-out infinite; }
-    @keyframes jump { 0% { transform: translateY(0) scale(0.96); } 25% { transform: translateY(-7px) scale(1.0); } 50% { transform: translateY(0) scale(0.96); } 100% { transform: translateY(0) scale(0.96); } }
+    /* actions group */
+    .actions-group { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap }
 
-    /* ===== mobile specific tweaks ===== */
-    @media (max-width:520px){
-      :root { --tiny-size: 9px; } /* you can set this to 5px if you want super tiny */
-      .container-max { padding:10px; margin:8px auto; }
-      h1 { font-size:1.05rem; }
-      p.lead { font-size:0.88rem; }
-      .card { padding:10px; border-radius:10px; }
-      input#studentId { padding:8px; font-size:0.95rem; }
-      .btn { padding:7px 10px; font-size:0.92rem; border-radius:8px; }
-      /* very compact table */
-      #resultArea table { font-size: var(--tiny-size); table-layout: fixed; }
-      #resultArea table th, #resultArea table td { padding:6px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      /* let subject column wrap inside the cell (so row doesn't stack) */
-      #resultArea table th:first-child, #resultArea table td:first-child { white-space:normal; width:55%; font-size:11px; }
-      /* tiny totals line */
-      #totalsInline { font-size: var(--tiny-size); gap:6px; }
-      #totalsInline .tot-item { margin-right:8px; }
-      .result-actions { flex-direction:row; gap:6px; }
-      .icon { width:16px; height:16px; margin-right:4px; }
+    /* loader */
+    #loaderOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,12,20,0.2);z-index:1100}
+    .loader-card{background:#fff;padding:14px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(2,6,23,0.18);text-align:center}
+    .dots{display:inline-flex;gap:8px;align-items:flex-end;margin-bottom:8px}
+    .dots .d{width:8px;height:8px;background:var(--primary);border-radius:50%;animation:jump .9s infinite}
+    .dots .d:nth-child(2){animation-delay:.12s}.dots .d:nth-child(3){animation-delay:.24s}
+    @keyframes jump{0%{transform:translateY(0)}25%{transform:translateY(-6px)}50%{transform:translateY(0)}}
+
+    /* responsive tweaks */
+    @media (max-width:540px){
+      :root{--tiny-size:9px;--btn-font:14px}
+      .student-name{font-size:1.02rem}
+      #resultArea th{font-size:0.9rem}
+      #resultArea td{font-size:0.95rem}
+      .grade-badge{font-size:0.9rem;padding:5px 8px}
+      .btn{font-size:14px;padding:8px 10px;border-radius:9px}
+      #resultArea td:not(:first-child){width:5ch}
     }
 
-    /* very small screens */
+    /* very small */
     @media (max-width:360px){
-      :root { --tiny-size: 8px; }
-      #resultArea table th:first-child, #resultArea table td:first-child { width:60%; }
+      #resultArea th{font-size:0.82rem}
+      #resultArea td{font-size:0.86rem}
     }
-
   </style>
 </head>
 <body>
-  <div class="container-max">
-    <div class="top-row" style="display:flex;align-items:flex-start;gap:10px;justify-content:space-between;flex-wrap:wrap">
-      <div class="header-left" style="min-width:0;flex:1 1 auto">
-        <h1>Soo dhawoow, arday!</h1>
-        <p class="lead">Fadlan geli aqoonsigaaga (ID) si aad u aragto natiijooyinka.</p>
-      </div>
-    </div>
+  <div class="container">
+    <h1>Soo dhawoow, arday!</h1>
+    <p class="lead">Fadlan geli aqoonsigaaga (ID) si aad u aragto natiijooyinka.</p>
 
-    <div class="card">
+    <div class="card small-card">
       <label for="studentId">Geli ID-gaaga halkan</label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="studentId" placeholder="12345" />
-        <button id="toggleIdInputBtn" class="btn" type="button" title="Hide/Show ID">🔒</button>
+      <div class="input-row" style="margin-top:6px">
+        <input id="studentId" placeholder="STD042687284" />
+        <button id="toggleIdInputBtn" class="btn" title="Toggle ID input visibility" aria-label="Toggle ID input">
+          <!-- eye-slashed SVG shown initial (input visible) -->
+          <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10.6 10.6A3 3 0 0 0 13.4 13.4" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 12c-2.2 4-6 7-9 7-1.3 0-2.6-.3-3.8-.9" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 12c2.2-4 6-7 9-7 1.3 0 2.6.3 3.8.9" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
-      <div style="margin-top:8px" class="actions">
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
         <button id="searchBtn" class="btn btn-primary">Raadi</button>
-        <div id="message" style="color:#c00;margin-top:0;align-self:center"></div>
+        <div id="message" style="color:#c00;font-weight:700"></div>
       </div>
     </div>
 
-    <div id="resultArea" style="display:none; margin-top:12px"></div>
+    <div id="resultArea" style="display:none"></div>
   </div>
 
-  <!-- centered loader overlay -->
-  <div id="loaderOverlay" aria-hidden="true" role="status" aria-live="polite">
-    <div class="loader-inner" role="presentation">
-      <div class="dots-wrap" aria-hidden="true">
-        <div class="dots" aria-hidden="true">
-          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-        </div>
-      </div>
-      <div class="loader-message" id="loaderMessage">Fadlan sug...</div>
-    </div>
-  </div>
+  <div id="loaderOverlay"><div class="loader-card"><div class="dots"><span class="d"></span><span class="d"></span><span class="d"></span></div><div id="loaderMessage" style="color:var(--muted)">Fadlan sug...</div></div></div>
 
-  <!-- html2canvas for screenshot capture -->
+  <!-- html2canvas and jsPDF (CDN) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-  <!-- keep these for PDF generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
