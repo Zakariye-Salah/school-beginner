@@ -7,36 +7,151 @@
   <link rel="stylesheet" href="style.css" />
   <style>
     /* small local styles so the result UI looks decent without extra CSS edits */
-    body { font-family: Inter, system-ui, Arial, sans-serif; background:#fbfdff; color:#0f172a; }
-    .card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(15,23,42,0.04); margin-bottom:12px; }
-    .btn { cursor:pointer; border:1px solid #dbeafe; background:#fff; padding:6px 10px; border-radius:8px; }
+    :root{
+      --bg: #fbfdff;
+      --text: #0f172a;
+      --muted: #6b7280;
+      --card-shadow: 0 6px 18px rgba(15,23,42,0.04);
+    }
+    html,body{height:100%}
+    body { font-family: Inter, system-ui, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
+    .container-max { max-width:900px; margin:20px auto; padding:12px; }
+
+    h1{ font-size:1.25rem; margin:0 0 6px 0; line-height:1.15; }
+    p.lead{ margin:0 0 12px 0; color:var(--muted); font-size:0.95rem; }
+
+    .card { background:#fff; border-radius:10px; padding:12px; box-shadow:var(--card-shadow); margin-bottom:12px; }
+    .btn { cursor:pointer; border:1px solid #dbeafe; background:#fff; padding:8px 12px; border-radius:8px; font-weight:600; }
     .btn-primary { background:#0b74ff; color:#fff; border-color:#0b74ff; }
     .btn-ghost { background:#fff; color:#0f172a; border-color:#e6eefc; }
-    input#studentId { width:100%; padding:8px; margin-top:6px; border-radius:8px; border:1px solid #e6eefc; }
-    table.table { width:100%; border-collapse:collapse; }
-    .card h2 { margin:0; }
+
+    input#studentId { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box; }
+    .actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+
+    table.table { width:100%; border-collapse:collapse; font-family:inherit; font-size:0.95rem; }
+    table.table th, table.table td { padding:8px 10px; text-align:left; vertical-align:middle; word-break:break-word; }
+    table.table thead tr { background:#f8fafc; }
+    .result-card h2 { margin:0; font-size:1.25rem; }
+
+    /* make result header & table more compact and prevent horizontal scroll */
+    #resultArea .card { padding:14px; border-radius:12px; }
+    #resultArea .card table { table-layout: auto; max-width:100%; }
+    #resultArea .card div, #resultArea .card p { font-size:0.95rem; }
+
+    /* loader overlay centered */
+    #loaderOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      backdrop-filter: blur(3px);
+      background: rgba(10,15,25,0.25);
+    }
+    .loader-inner {
+      background: rgba(255,255,255,0.98);
+      padding: 18px 20px;
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(2,6,23,0.35);
+      min-width:240px;
+      max-width:90%;
+      text-align:center;
+    }
+
+    /* three dots with jumping + rotating ring */
+    .dots-wrap { display:inline-block; position:relative; width:72px; height:40px; margin-bottom:10px; }
+    .dots { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .dot {
+      width:12px; height:12px; background:#0b74ff; border-radius:50%;
+      transform-origin:center;
+      animation: jump 900ms ease-in-out infinite;
+    }
+    .dot:nth-child(2){ animation-delay: 120ms; }
+    .dot:nth-child(3){ animation-delay: 240ms; }
+
+    @keyframes jump {
+      0% { transform: translateY(0) scale(0.95); }
+      25% { transform: translateY(-8px) scale(1.0); }
+      50% { transform: translateY(0) scale(0.95); }
+      100% { transform: translateY(0) scale(0.95); }
+    }
+
+    /* rotating ring */
+    .ring {
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .ring svg { width:72px; height:72px; animation: spin 3500ms linear infinite; opacity:0.12; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-message { color:var(--muted); font-size:0.95rem; min-height:20px; }
+
+    /* responsive tweaks */
+    @media (max-width:520px){
+      h1{ font-size:1.05rem; }
+      .container-max{ padding:10px; }
+      input#studentId{ font-size:0.95rem; padding:8px; }
+      .btn { padding:8px 10px; font-size:0.95rem; }
+      .loader-inner{ padding:12px; min-width:200px; }
+      table.table th, table.table td { padding:6px 8px; font-size:0.85rem; }
+      .result-card h2{ font-size:1.05rem; }
+    }
+
+    /* small helper so header doesn't overflow */
+    .top-row { display:flex; align-items:flex-start; gap:14px; justify-content:space-between; flex-wrap:wrap; }
+    .header-left { min-width:0; flex:1 1 auto; }
+
+    /* keep PDF & more buttons visually close */
+    .actions .btn { padding:8px 12px; }
   </style>
 </head>
 <body>
-  <div style="max-width:900px;margin:20px auto">
-    <h1>Soo dhawoow, arday!</h1>
-    <p>Fadlan geli aqoonsigaaga (ID) si aad u aragto natiijooyinka.</p>
+  <div class="container-max">
+    <div class="top-row">
+      <div class="header-left">
+        <h1>Soo dhawoow, arday!</h1>
+        <p class="lead">Fadlan geli aqoonsigaaga (ID) si aad u aragto natiijooyinka.</p>
+      </div>
+    </div>
 
     <div class="card">
       <label for="studentId">Geli ID-gaaga halkan</label>
       <input id="studentId" placeholder="12345" />
-      <div style="margin-top:8px">
+      <div style="margin-top:8px" class="actions">
         <button id="searchBtn" class="btn btn-primary">Raadi</button>
+        <div id="message" style="color:#c00;margin-top:0;align-self:center"></div>
       </div>
-      <div id="message" style="color:#c00;margin-top:8px"></div>
     </div>
 
     <div id="resultArea" style="display:none; margin-top:18px"></div>
   </div>
 
+  <!-- centered loader overlay -->
+  <div id="loaderOverlay" aria-hidden="true" role="status" aria-live="polite">
+    <div class="loader-inner" role="presentation">
+      <div class="dots-wrap" aria-hidden="true">
+        <div class="ring" aria-hidden="true">
+          <!-- simple ring SVG -->
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M18 2a16 16 0 1 0 0 32 16 16 0 1 0 0-32z" stroke="#0b74ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div class="dots" aria-hidden="true">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+      </div>
+      <div class="loader-message" id="loaderMessage">Fadlan sug...</div>
+    </div>
+  </div>
+
   <!-- add these before loading main.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
   <script type="module" src="main.js"></script>
 </body>
