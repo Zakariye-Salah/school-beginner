@@ -1,4 +1,5 @@
-// main.js (PUBLIC) - COMPLETE FILE
+// main.js (UPDATED: adds loader overlay, rotating messages, responsive PDF tweaks)
+// Keep your original imports
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -7,70 +8,44 @@ const studentIdInput = document.getElementById('studentId');
 const resultArea = document.getElementById('resultArea');
 const message = document.getElementById('message');
 
+const loaderOverlay = document.getElementById('loaderOverlay');
+const loaderMessageEl = document.getElementById('loaderMessage');
+
 const publishedListState = {}; // studentId -> { visible: bool, container: DOMElement, selectedExamId: string }
 
-searchBtn.onclick = async () => {
-  const studentId = studentIdInput.value.trim();
-  message.textContent = '';
-  resultArea.style.display = 'none';
-  resultArea.innerHTML = '';
-  if(!studentId) { message.textContent = 'Fadlan geli ID sax ah.'; return; }
+/* ----- LOADER helpers ----- */
+let loaderInterval = null;
+const loaderMessages = [
+  'Fadlan sug...',
+  'Waxaan hubineynaa xogta...',
+  'Waxaa la soo rarayaa natiijooyinka...',
+  'Ku dhowaaneysa—fadlan sug...',
+  'Fadlan sii sug, waxaan raadineynaa faylasha...'
+];
 
-  try {
-    const latestSnap = await getDoc(doc(db,'studentsLatest', studentId));
-    let latest = latestSnap.exists() ? latestSnap.data() : null;
+function showLoader() {
+  if(!loaderOverlay) return;
+  loaderOverlay.style.display = 'flex';
+  loaderOverlay.setAttribute('aria-hidden','false');
+  // start message cycle
+  let idx = 0;
+  loaderMessageEl.textContent = loaderMessages[0];
+  if(loaderInterval) clearInterval(loaderInterval);
+  loaderInterval = setInterval(()=> {
+    idx = (idx + 1) % loaderMessages.length;
+    loaderMessageEl.textContent = loaderMessages[idx];
+  }, 2200);
+}
 
-    if(latest && !latest.motherName){
-      try {
-        const sSnap = await getDoc(doc(db,'students', studentId));
-        if(sSnap.exists()){
-          const sData = sSnap.data();
-          if(sData && sData.motherName){
-            latest.motherName = sData.motherName;
-          }
-        }
-      } catch(e){
-        console.warn('Could not fetch student doc to fill motherName', e);
-      }
-    }
+function hideLoader() {
+  if(!loaderOverlay) return;
+  loaderOverlay.style.display = 'none';
+  loaderOverlay.setAttribute('aria-hidden','true');
+  if(loaderInterval) { clearInterval(loaderInterval); loaderInterval = null; }
+  loaderMessageEl.textContent = '';
+}
 
-    if(!latest){
-      const alt = await fallbackFindLatestExamTotal(studentId);
-      if(!alt){
-        message.textContent = 'Natiijo la heli waayey. Fadlan hubi ID-ga.'; 
-        return;
-      } else {
-        await renderResult(alt, { source: 'examTotals' });
-        return;
-      }
-    }
-
-    if(latest.blocked){
-      resultArea.style.display = 'block';
-      resultArea.innerHTML = `<div class="card"><h2>Access blocked</h2><p>${escape(latest.blockMessage || 'You are not allowed to view results.')}</p></div>`;
-      return;
-    }
-
-    const alt = await fallbackFindLatestExamTotal(studentId);
-    if(alt && alt.publishedAt && latest.publishedAt) {
-      const altSeconds = alt.publishedAt.seconds || (new Date(alt.publishedAt).getTime()/1000);
-      const latestSeconds = latest.publishedAt.seconds || (new Date(latest.publishedAt).getTime()/1000);
-      if(altSeconds > latestSeconds){
-        await renderResult(alt, { source: 'examTotals' });
-        return;
-      }
-    } else if(alt && !latest.publishedAt){
-      await renderResult(alt, { source: 'examTotals' });
-      return;
-    }
-
-    await renderResult(latest, { source: 'AL-Fatxi School' });
-  } catch(err){
-    console.error(err); message.textContent = 'Khalad ayaa dhacay. Fadlan isku day mar kale.';
-  }
-};
-
-/* ---------- helpers for styling ---------- */
+/* ---------- rest of your helpers & functions (unchanged except small PDF tweaks) ---------- */
 
 function rankColor(rank){
   if(rank === 1) return '#FFD700';
@@ -91,15 +66,15 @@ function percentColor(p){
 }
 
 function gradeColor(grade){
-  // returns background color for grade badge
-  if(grade === 'A+' ) return '#0b8a3e';    // dark green
-  if(grade === 'A' ) return '#26a64b';     // green
-  if(grade === 'A-' ) return '#66d17a';    // light green
-  if(grade.startsWith('B')) return '#3b82f6'; // blue-ish
-  if(grade.startsWith('C')) return '#f59e0b'; // yellow/orange
+  // returns background color for grade badge - keep same
+  if(grade === 'A+' ) return '#0b8a3e';
+  if(grade === 'A' ) return '#26a64b';
+  if(grade === 'A-' ) return '#66d17a';
+  if(grade.startsWith('B')) return '#3b82f6';
+  if(grade.startsWith('C')) return '#f59e0b';
   if(grade.startsWith('D')) return '#f97316';
   if(grade.startsWith('E')) return '#ef4444';
-  return '#b91c1c'; // F -> strong red
+  return '#b91c1c';
 }
 
 function escape(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
@@ -110,9 +85,6 @@ async function renderResult(doc, opts = {}) {
   resultArea.innerHTML = '';
   const published = doc.publishedAt ? new Date(doc.publishedAt.seconds ? doc.publishedAt.seconds*1000 : doc.publishedAt).toLocaleString() : '';
   const examName = doc.examName || doc.examId || '';
-
-  // detect presence of linked exam info (either snapshot or per-subject linked component)
-  const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
 
   let compsEnabled = doc.components || null;
   if(!compsEnabled){
@@ -130,22 +102,22 @@ async function renderResult(doc, opts = {}) {
 
   const motherLine = doc.motherName ? `<div style="margin-top:6px"><strong>Ina Hooyo:</strong> ${escape(doc.motherName)}</div>` : '';
 
-  // linked label: prefer snapshot field, else placeholder 'Prev' and fetch actual name later if needed
   let linkedLabel = doc.linkedExamName || (doc.linkedExamId ? 'Prev' : null);
   const examLabel = examName || 'Exam';
 
-  const moreBtnId = `moreExamsBtn_${escape(doc.studentId)}`;
-  let html = `<div class="card" style="padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.06);">
+  const moreBtnId = `moreExamsBtn_${escape(String(doc.studentId))}`;
+  let html = `<div class="card result-card" style="padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.06);">
     <h2 style="margin:0 0 8px 0;font-size:1.4rem;color:#0f172a">${escape(doc.studentName || 'Magac aan la garanayn')}</h2>
     ${motherLine}
-    <div style="color:#6b7280;margin-top:6px">ID: <strong>${escape(doc.studentId)}</strong> | Class: <strong>${escape(doc.className || doc.classId || '')}</strong></div>
-    <div style="margin-top:8px;color:#374151"><strong>Exam:</strong> ${escape(examLabel)} ${doc.examId?`(<small style="color:#6b7280">${escape(doc.examId)}</small>)`:''}</div>
+    <div style="color:#6b7280;margin-top:6px;font-size:0.95rem">ID: <strong>${escape(doc.studentId)}</strong> | Class: <strong>${escape(doc.className || doc.classId || '')}</strong></div>
+    <div style="margin-top:8px;color:#374151;font-size:0.95rem"><strong>Exam:</strong> ${escape(examLabel)} ${doc.examId?`(<small style="color:#6b7280">${escape(doc.examId)}</small>)`:''}</div>
     <div style="margin-top:4px;color:#9ca3af;font-size:0.85rem">Published: ${escape(published)}</div>`;
 
   if(opts.source) html += `<div style="margin-top:6px;color:#6b7280;font-size:0.85rem">Source: ${escape(opts.source)}</div>`;
 
   // table header
   html += `<div style="overflow:auto;margin-top:12px"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead><tr style="background:#f8fafc"><th style="text-align:left;padding:8px 10px">Subject</th>`;
+  const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
   if(hasLinked) html += `<th id="linkedHeader" style="text-align:center;padding:8px 10px">${escape(linkedLabel || 'Prev')}</th>`;
   if(compsEnabled.assignment) html += `<th style="text-align:center;padding:8px 10px">Assignment</th>`;
   if(compsEnabled.quiz) html += `<th style="text-align:center;padding:8px 10px">Quiz</th>`;
@@ -187,7 +159,7 @@ async function renderResult(doc, opts = {}) {
 
       html += `<td style="text-align:center;padding:8px 10px">${escape(String(rowTotal))}</td><td style="text-align:center;padding:8px 10px">${escape(String(rowMax||''))}</td></tr>`;
 
-      totGot += rowTotal; totMax += rowMax;
+      totGot += Number(rowTotal||0); totMax += Number(rowMax||0);
     }
   }
 
@@ -204,8 +176,6 @@ async function renderResult(doc, opts = {}) {
   const percentCol = percentColor(percent);
   const gradeBg = gradeColor(grade);
 
-  // compute counts for ranks (school size & class size) asynchronously then set text
-  // but build initial rank text here as placeholders; we will update them
   const schoolRankText = doc.schoolRank ? `${escape(String(doc.schoolRank))}` : '/—';
   const classRankText = doc.classRank ? `${escape(String(doc.classRank))}` : '/—';
 
@@ -223,7 +193,7 @@ async function renderResult(doc, opts = {}) {
     <span id="classRankCell" style="font-weight:600">Class rank: ${classRankText}</span>
   </div>`;
 
-  html += `<div style="margin-top:12px;display:flex;gap:8px">
+  html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
     <button id="printBtn" class="btn btn-primary" style="padding:8px 12px;border-radius:8px">Daabac (PDF)</button>
     <button id="${moreBtnId}" class="btn btn-ghost" style="padding:8px 12px;border-radius:8px">More published exams</button>
   </div>`;
@@ -232,31 +202,35 @@ async function renderResult(doc, opts = {}) {
 
   resultArea.innerHTML = html;
 
-  // wire print -> PDF generation
+  // hide loader if present
+  hideLoader();
+
+  // wire print -> PDF generation (tighter margins & smaller fonts to fit)
   document.getElementById('printBtn').onclick = async () => {
-    // attempt PDF via jsPDF + autotable
     try {
       if(!(window.jspdf && window.jspdf.jsPDF)) throw new Error('jsPDF not available');
       const { jsPDF } = window.jspdf;
-      const docPdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
-      const margin = 40;
-      let cursorY = 40;
+      // use landscape only if many columns; else portrait - pick portrait for better readability on mobile
+      const docPdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const margin = 20; // smaller margins to pack content
+      let cursorY = margin;
 
-      // header with name / mother / id / class / exam / published / source
-      docPdf.setFontSize(14);
+      // header (smaller font sizes)
+      docPdf.setFontSize(12);
       docPdf.text(`${doc.studentName || ''}`, margin, cursorY);
-      docPdf.setFontSize(10);
-      if(doc.motherName) docPdf.text(`Ina Hooyo: ${doc.motherName}`, margin, cursorY + 18);
-      docPdf.text(`ID: ${doc.studentId}  |  Class: ${doc.className || doc.classId || ''}`, margin, cursorY + 36);
-      docPdf.text(`Exam: ${examLabel} ${doc.examId ? `(${doc.examId})` : ''}`, margin, cursorY + 54);
-      docPdf.text(`Published: ${published}`, margin, cursorY + 72);
-      docPdf.text(`Source: ${opts.source || ''}`, margin, cursorY + 90);
-      cursorY += 110;
+      docPdf.setFontSize(9);
+      if(doc.motherName) docPdf.text(`Ina Hooyo: ${doc.motherName}`, margin, cursorY + 16);
+      docPdf.text(`ID: ${doc.studentId}  |  Class: ${doc.className || doc.classId || ''}`, margin, cursorY + 32);
+      docPdf.text(`Exam: ${examLabel} ${doc.examId ? `(${doc.examId})` : ''}`, margin, cursorY + 48);
+      docPdf.text(`Published: ${published}`, margin, cursorY + 64);
+      docPdf.text(`Source: ${opts.source || ''}`, margin, cursorY + 80);
+      cursorY += 96;
 
       // build columns for autotable
       const subjectCols = [];
       subjectCols.push({ header: 'Subject', dataKey: 'subject' });
-      if(hasLinked) subjectCols.push({ header: (doc.linkedExamName || linkedLabel || 'Prev'), dataKey: 'linked' });
+      const hasLinkedCol = hasLinked;
+      if(hasLinkedCol) subjectCols.push({ header: (doc.linkedExamName || linkedLabel || 'Prev'), dataKey: 'linked' });
       if(compsEnabled.assignment) subjectCols.push({ header: 'Assignment', dataKey: 'assignment' });
       if(compsEnabled.quiz) subjectCols.push({ header: 'Quiz', dataKey: 'quiz' });
       if(compsEnabled.monthly) subjectCols.push({ header: 'Monthly', dataKey: 'monthly' });
@@ -267,7 +241,7 @@ async function renderResult(doc, opts = {}) {
       const tableData = (doc.subjects||[]).map(s => {
         const comps = s.components || {};
         const obj = { subject: s.name };
-        if(hasLinked) obj.linked = (s.components && s.components.linked && typeof s.components.linked.total !== 'undefined') ? String(s.components.linked.total) : ((typeof s.components?.linked === 'number') ? String(s.components.linked) : '-');
+        if(hasLinkedCol) obj.linked = (s.components && s.components.linked && typeof s.components.linked.total !== 'undefined') ? String(s.components.linked.total) : ((typeof s.components?.linked === 'number') ? String(s.components.linked) : '-');
         if(compsEnabled.assignment) obj.assignment = (comps.assignment != null) ? String(comps.assignment) : (s.assignment != null ? String(s.assignment) : '-');
         if(compsEnabled.quiz) obj.quiz = (comps.quiz != null) ? String(comps.quiz) : (s.quiz != null ? String(s.quiz) : '-');
         if(compsEnabled.monthly) obj.monthly = (comps.monthly != null) ? String(comps.monthly) : (s.monthly != null ? String(s.monthly) : '-');
@@ -277,31 +251,31 @@ async function renderResult(doc, opts = {}) {
         return obj;
       });
 
-      // autotable
+      // autotable with small font and compact cell padding
       docPdf.autoTable({
         startY: cursorY,
         head: [subjectCols.map(c => c.header)],
         body: tableData.map(row => subjectCols.map(c => row[c.dataKey] || '')),
-        styles: { fontSize: 9, cellPadding: 6 },
+        styles: { fontSize: 8, cellPadding: 4 },
         headStyles: { fillColor: [240,240,240], textColor: [20,20,20], fontStyle: 'bold' },
-        margin: { left: margin, right: margin }
+        margin: { left: margin, right: margin },
+        tableWidth: 'auto'
       });
 
-      // footer totals & grade block
-      const footY = docPdf.lastAutoTable ? docPdf.lastAutoTable.finalY + 18 : docPdf.internal.pageSize.getHeight() - 80;
-      docPdf.setFontSize(10);
+      const footY = docPdf.lastAutoTable ? docPdf.lastAutoTable.finalY + 12 : docPdf.internal.pageSize.getHeight() - 80;
+      docPdf.setFontSize(9);
       docPdf.text(`Total: ${total} / ${sumMax}`, margin, footY);
-      docPdf.text(`Percent: ${percent.toFixed(2)}%`, margin + 220, footY);
-      docPdf.text(`Average: ${Number(averageRaw).toFixed(2)}`, margin + 360, footY);
-      // grade with colored rectangle
+      docPdf.text(`Percent: ${percent.toFixed(2)}%`, margin + 200, footY);
+      docPdf.text(`Average: ${Number(averageRaw).toFixed(2)}`, margin + 320, footY);
+
+      // grade box small
       docPdf.setFillColor( parseInt(gradeBg.slice(1,3),16), parseInt(gradeBg.slice(3,5),16), parseInt(gradeBg.slice(5,7),16) );
-      // small rectangle then grade text
-      docPdf.rect(margin + 500, footY - 8, 40, 16, 'F'); // filled with current fill color
+      docPdf.rect(margin + 420, footY - 8, 36, 16, 'F');
       docPdf.setTextColor(255,255,255);
-      docPdf.text(`${grade}`, margin + 508, footY + 4);
+      docPdf.text(`${grade}`, margin + 428, footY + 4);
       docPdf.setTextColor(0,0,0);
 
-      // ranks counts: attempt to fetch counts and append to PDF
+      // ranks counts: attempt to fetch counts and append to PDF (try/catch)
       if(doc.examId){
         try {
           const qAll = query(collection(db,'examTotals'), where('examId','==', doc.examId));
@@ -316,8 +290,8 @@ async function renderResult(doc, opts = {}) {
             });
           }
 
-          docPdf.text(`School rank: ${doc.schoolRank ? doc.schoolRank + ' / ' + schoolSize : '/—'}`, margin, footY + 28);
-          docPdf.text(`Class rank: ${doc.classRank ? doc.classRank + ' / ' + classSize : '/—'}`, margin + 220, footY + 28);
+          docPdf.text(`School rank: ${doc.schoolRank ? doc.schoolRank + ' / ' + schoolSize : '/—'}`, margin, footY + 24);
+          docPdf.text(`Class rank: ${doc.classRank ? doc.classRank + ' / ' + classSize : '/—'}`, margin + 200, footY + 24);
         } catch(e){
           // ignore
         }
@@ -327,7 +301,6 @@ async function renderResult(doc, opts = {}) {
       docPdf.save(fname);
       return;
     } catch(e){
-      // fallback to window.print if jsPDF not available
       console.warn('PDF generation failed or jsPDF not present, falling back to print:', e);
       window.print();
       return;
@@ -503,3 +476,70 @@ async function fallbackFindLatestExamTotal(studentId){
     return null;
   }
 }
+
+/* ---------- main search click ---------- */
+searchBtn.onclick = async () => {
+  const studentId = studentIdInput.value.trim();
+  message.textContent = '';
+  resultArea.style.display = 'none';
+  resultArea.innerHTML = '';
+  if(!studentId) { message.textContent = 'Fadlan geli ID sax ah.'; return; }
+
+  showLoader(); // show the centered loader with cycling messages
+
+  try {
+    const latestSnap = await getDoc(doc(db,'studentsLatest', studentId));
+    let latest = latestSnap.exists() ? latestSnap.data() : null;
+
+    if(latest && !latest.motherName){
+      try {
+        const sSnap = await getDoc(doc(db,'students', studentId));
+        if(sSnap.exists()){
+          const sData = sSnap.data();
+          if(sData && sData.motherName){
+            latest.motherName = sData.motherName;
+          }
+        }
+      } catch(e){
+        console.warn('Could not fetch student doc to fill motherName', e);
+      }
+    }
+
+    if(!latest){
+      const alt = await fallbackFindLatestExamTotal(studentId);
+      if(!alt){
+        message.textContent = 'Natiijo la heli waayey. Fadlan hubi ID-ga.';
+        hideLoader();
+        return;
+      } else {
+        await renderResult(alt, { source: 'examTotals' });
+        return;
+      }
+    }
+
+    if(latest.blocked){
+      resultArea.style.display = 'block';
+      resultArea.innerHTML = `<div class="card"><h2>Access blocked</h2><p>${escape(latest.blockMessage || 'You are not allowed to view results.')}</p></div>`;
+      hideLoader();
+      return;
+    }
+
+    const alt = await fallbackFindLatestExamTotal(studentId);
+    if(alt && alt.publishedAt && latest.publishedAt) {
+      const altSeconds = alt.publishedAt.seconds || (new Date(alt.publishedAt).getTime()/1000);
+      const latestSeconds = latest.publishedAt.seconds || (new Date(latest.publishedAt).getTime()/1000);
+      if(altSeconds > latestSeconds){
+        await renderResult(alt, { source: 'examTotals' });
+        return;
+      }
+    } else if(alt && !latest.publishedAt){
+      await renderResult(alt, { source: 'examTotals' });
+      return;
+    }
+
+    await renderResult(latest, { source: 'AL-Fatxi School' });
+  } catch(err){
+    console.error(err); message.textContent = 'Khalad ayaa dhacay. Fadlan isku day mar kale.';
+    hideLoader();
+  }
+};
