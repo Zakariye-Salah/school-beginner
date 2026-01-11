@@ -39,10 +39,11 @@
     /* Table */
     #resultArea table { width:100%; border-collapse:collapse; font-family:inherit; }
     #resultArea thead tr { background:#f8fafc }
-    #resultArea th, #resultArea td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-    #resultArea th { font-weight:800; text-align:center; white-space:normal; } /* allow header wrapping - no dots */
-    #resultArea td { font-weight:700; text-align:center; }
-    #resultArea td:first-child, #resultArea th:first-child { text-align:left; font-weight:800; }
+    /* subject header slightly bigger than others; other headers small (12px) */
+    #resultArea th { font-weight:800; text-align:center; white-space:normal; font-size:12px; }
+    #resultArea th:first-child { font-size:13px; text-align:left; }
+    #resultArea td { font-weight:700; text-align:center; font-size:13px; }
+    #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; }
 
     /* numeric columns compact and no-wrap */
     #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; width:6ch; }
@@ -69,8 +70,8 @@
     @media (max-width:540px){
       :root{--tiny-size:9px;--btn-font:14px}
       .student-name{font-size:1.02rem}
-      #resultArea th{font-size:0.9rem}
-      #resultArea td{font-size:0.95rem}
+      #resultArea th{font-size:11px}
+      #resultArea td{font-size:12px}
       .grade-badge{font-size:0.9rem;padding:5px 8px}
       .btn{font-size:14px;padding:8px 10px;border-radius:9px}
       #resultArea td:not(:first-child){width:5ch}
@@ -78,8 +79,8 @@
 
     /* very small */
     @media (max-width:360px){
-      #resultArea th{font-size:0.82rem}
-      #resultArea td{font-size:0.86rem}
+      #resultArea th{font-size:10px}
+      #resultArea td{font-size:11px}
     }
   </style>
 </head>
@@ -93,12 +94,9 @@
       <div class="input-row" style="margin-top:6px">
         <input id="studentId" placeholder="STD042687284" />
         <button id="toggleIdInputBtn" class="btn" title="Toggle ID input visibility" aria-label="Toggle ID input">
-          <!-- eye-slashed SVG shown initial (input visible) -->
+          <!-- initial icon: eye open -->
           <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10.6 10.6A3 3 0 0 0 13.4 13.4" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M21 12c-2.2 4-6 7-9 7-1.3 0-2.6-.3-3.8-.9" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M3 12c2.2-4 6-7 9-7 1.3 0 2.6.3 3.8.9" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/>
           </svg>
         </button>
       </div>
