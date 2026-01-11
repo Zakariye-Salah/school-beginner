@@ -12,6 +12,8 @@
       --muted: #6b7280;
       --card-shadow: 0 6px 18px rgba(15,23,42,0.04);
       --primary: #0b74ff;
+      /* tiny size used for extremely compact mobile text — change to 5px if you really want it that tiny */
+      --tiny-size: 9px;
     }
     html,body{height:100%}
     body { font-family: Inter, system-ui, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
@@ -28,160 +30,66 @@
     input#studentId { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box; }
     .actions { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
-    /* Scoped table styles for resultArea */
-    #resultArea table { width:100%; border-collapse:collapse; font-family:inherit; font-size:0.95rem; table-layout:auto; }
-    #resultArea table th, #resultArea table td { padding:8px 10px; text-align:center; vertical-align:middle; word-break:break-word; border-collapse:collapse; }
+    /* result area table */
+    #resultArea table { width: 100%; border-collapse: collapse; font-family: inherit; table-layout:auto; }
+    #resultArea table th, #resultArea table td { padding: 8px 10px; text-align:center; vertical-align:middle; border-collapse:collapse; }
     #resultArea table thead tr { background:#f8fafc; }
-    /* subject column left aligned and allowed to wrap */
-    #resultArea table th:first-child, #resultArea table td:first-child { text-align:left; width:48%; padding-left:8px; word-break:break-word; }
+    #resultArea table th:first-child, #resultArea table td:first-child { text-align:left; padding-left:10px; word-break:break-word; }
 
-    .result-card h2 { margin:0; font-size:1.25rem; }
+    /* header row (name + id on the same line) */
+    .result-header { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+    .student-name { font-size:1.2rem; font-weight:800; }
+    .student-name.slanted { display:inline-block; transform:skewX(-3deg); font-style:italic; }
+    .student-meta { color:var(--muted); font-size:0.92rem; display:flex; gap:8px; align-items:center; }
 
-    /* Compact totals */
-    #totalsBlock { margin-top:12px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:0.95rem; }
-    #ranksBlock { margin-top:8px; font-weight:600; font-size:0.95rem; color:var(--text); }
+    /* totals line (inline) */
+    #totalsInline { margin-top:12px; display:flex; gap:14px; align-items:center; flex-wrap:nowrap; white-space:nowrap; font-weight:600; }
+    .tot-item { display:inline-block; margin-right:10px; font-size:0.95rem; }
+    .tiny { font-size: var(--tiny-size) !important; } /* super-compact helper */
+
+    /* compact badges */
+    #gradeBadge { padding:4px 8px; border-radius:6px; font-weight:800; font-size:0.85rem; color:#fff; display:inline-block; }
+
+    /* actions row: include screenshot icon and print */
+    .result-actions { margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+    /* small icons inside buttons */
+    .icon { width:18px; height:18px; display:inline-block; vertical-align:middle; margin-right:6px; }
 
     /* loader overlay centered */
-    #loaderOverlay {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1100;
-      backdrop-filter: blur(3px);
-      background: rgba(10,15,25,0.20);
-    }
-    .loader-inner {
-      background: rgba(255,255,255,0.98);
-      padding: 14px 16px;
-      border-radius: 12px;
-      box-shadow: 0 12px 40px rgba(2,6,23,0.20);
-      min-width:200px;
-      max-width:90%;
-      text-align:center;
-    }
+    #loaderOverlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1100; backdrop-filter: blur(3px); background: rgba(10,15,25,0.20); }
+    .loader-inner { background: rgba(255,255,255,0.98); padding: 14px 16px; border-radius: 12px; box-shadow: 0 12px 40px rgba(2,6,23,0.20); min-width:200px; max-width:90%; text-align:center; }
     .dots-wrap { display:inline-block; position:relative; width:72px; height:40px; margin-bottom:8px; }
     .dots { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; gap:8px; }
     .dot { width:10px; height:10px; background:var(--primary); border-radius:50%; transform-origin:center; animation: jump 900ms ease-in-out infinite; }
-    .dot:nth-child(2){ animation-delay: 120ms; } .dot:nth-child(3){ animation-delay: 240ms; }
     @keyframes jump { 0% { transform: translateY(0) scale(0.96); } 25% { transform: translateY(-7px) scale(1.0); } 50% { transform: translateY(0) scale(0.96); } 100% { transform: translateY(0) scale(0.96); } }
-    .ring { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
-    .ring svg { width:72px; height:72px; animation: spin 3500ms linear infinite; opacity:0.12; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loader-message { color:var(--muted); font-size:0.95rem; min-height:20px; }
 
-    /* ===== mobile specific (compact) ===== */
+    /* ===== mobile specific tweaks ===== */
     @media (max-width:520px){
+      :root { --tiny-size: 9px; } /* you can set this to 5px if you want super tiny */
       .container-max { padding:10px; margin:8px auto; }
       h1 { font-size:1.05rem; }
       p.lead { font-size:0.88rem; }
       .card { padding:10px; border-radius:10px; }
       input#studentId { padding:8px; font-size:0.95rem; }
       .btn { padding:7px 10px; font-size:0.92rem; border-radius:8px; }
-      /* make table very compact */
-      #resultArea table { font-size:0.82rem; }
-      #resultArea table th, #resultArea table td { padding:6px 6px; }
-      #resultArea table th:first-child, #resultArea table td:first-child { width:58%; padding-left:6px; font-size:0.86rem; }
-      /* numeric columns shrink */
-      #resultArea table th:not(:first-child), #resultArea table td:not(:first-child) { white-space:nowrap; width:auto; padding:6px 6px; font-size:0.82rem; }
-      .result-card h2 { font-size:1.02rem; margin-bottom:4px; }
-      #totalsBlock { gap:8px; font-size:0.92rem; display:flex; flex-direction:column; align-items:flex-start; }
-      #ranksBlock { font-size:0.92rem; }
-      /* shrink loader */
-      .loader-inner { padding:10px; min-width:180px; }
-      .dot { width:8px; height:8px; }
-      .ring svg { width:56px; height:56px; }
-      /* keep PDF & buttons stacked */
-      .actions { flex-direction:column; align-items:flex-start; gap:8px; }
+      /* very compact table */
+      #resultArea table { font-size: var(--tiny-size); table-layout: fixed; }
+      #resultArea table th, #resultArea table td { padding:6px 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      /* let subject column wrap inside the cell (so row doesn't stack) */
+      #resultArea table th:first-child, #resultArea table td:first-child { white-space:normal; width:55%; font-size:11px; }
+      /* tiny totals line */
+      #totalsInline { font-size: var(--tiny-size); gap:6px; }
+      #totalsInline .tot-item { margin-right:8px; }
+      .result-actions { flex-direction:row; gap:6px; }
+      .icon { width:16px; height:16px; margin-right:4px; }
     }
 
     /* very small screens */
     @media (max-width:360px){
-      #resultArea table { font-size:0.78rem; }
+      :root { --tiny-size: 8px; }
       #resultArea table th:first-child, #resultArea table td:first-child { width:60%; }
-      #resultArea table th:not(:first-child), #resultArea table td:not(:first-child) { font-size:0.75rem; padding:5px 4px; }
-      .btn { font-size:0.9rem; padding:6px 8px; }
     }
-
-    /* ---------- table: compact, no weird wrapping on mobile ---------- */
-/* Base: compact table */
-#resultArea table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: inherit;
-  /* keep automatic layout on desktop for best sizing */
-  table-layout: auto;
-}
-
-/* normal padding on desktop */
-#resultArea table th,
-#resultArea table td {
-  padding: 8px 10px;
-  text-align: center;
-  vertical-align: middle;
-  word-break: normal; /* avoid breaking numbers mid-word */
-}
-
-/* subject left-aligned */
-#resultArea table th:first-child,
-#resultArea table td:first-child {
-  text-align: left;
-  padding-left: 10px;
-  word-break: break-word;
-}
-
-/* ===== mobile: force fixed layout, shrink numeric columns ===== */
-@media (max-width: 520px) {
-  /* Use fixed layout so column widths do not expand unexpectedly */
-  #resultArea table {
-    table-layout: fixed;
-    font-size: 0.82rem;
-  }
-
-  /* Make numeric columns very narrow and prevent wrapping there */
-  #resultArea table th,
-  #resultArea table td {
-    padding: 6px 6px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap; /* prevent numeric cells from wrapping */
-  }
-
-  /* Allow subject column to wrap (so long subject names flow to next line inside that cell only) */
-  #resultArea table th:first-child,
-  #resultArea table td:first-child {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    font-weight: 600;
-    /* give subject column the largest share */
-    width: 55%;
-  }
-
-  /* Give numeric columns a small fixed width so the row stays on one line */
-  /* These rules apply to 2nd..nth columns (exam, monthly, final, total, max, etc.) */
-  #resultArea table th:not(:first-child),
-  #resultArea table td:not(:first-child) {
-    width: 6ch;        /* small but enough for values like "100" or "40" */
-    text-align: center;
-  }
-
-  /* Very small screens: make numbers even tighter */
-  @media (max-width: 360px) {
-    #resultArea table th:not(:first-child),
-    #resultArea table td:not(:first-child) {
-      width: 5ch;
-      padding: 5px 4px;
-      font-size: 0.78rem;
-    }
-    #resultArea table th:first-child,
-    #resultArea table td:first-child {
-      width: 60%;
-      font-size: 0.88rem;
-    }
-  }
-}
 
   </style>
 </head>
@@ -196,7 +104,10 @@
 
     <div class="card">
       <label for="studentId">Geli ID-gaaga halkan</label>
-      <input id="studentId" placeholder="12345" />
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="studentId" placeholder="12345" />
+        <button id="toggleIdInputBtn" class="btn" type="button" title="Hide/Show ID">🔒</button>
+      </div>
       <div style="margin-top:8px" class="actions">
         <button id="searchBtn" class="btn btn-primary">Raadi</button>
         <div id="message" style="color:#c00;margin-top:0;align-self:center"></div>
@@ -210,11 +121,6 @@
   <div id="loaderOverlay" aria-hidden="true" role="status" aria-live="polite">
     <div class="loader-inner" role="presentation">
       <div class="dots-wrap" aria-hidden="true">
-        <div class="ring" aria-hidden="true">
-          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M18 2a16 16 0 1 0 0 32 16 16 0 1 0 0-32z" stroke="#0b74ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
         <div class="dots" aria-hidden="true">
           <div class="dot"></div><div class="dot"></div><div class="dot"></div>
         </div>
@@ -223,10 +129,13 @@
     </div>
   </div>
 
-  <!-- keep these; main.js unchanged -->
+  <!-- html2canvas for screenshot capture -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- keep these for PDF generation -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
   <script type="module" src="main.js"></script>
 </body>
 </html>
-
