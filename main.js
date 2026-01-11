@@ -52,7 +52,6 @@ function gradeColor(g){
   return '#b91c1c';
 }
 
-/* ---------- renderResult: new header, clean table, exact totals layout ---------- */
 async function renderResult(doc, opts = {}){
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -436,24 +435,6 @@ async function togglePublishedList(studentId){
 }
 
 /* ---------- utility: grade mapping ---------- */
-function gradeForPercent(p){
-  if(p >= 97) return 'A+';
-  if(p >= 93) return 'A';
-  if(p >= 90) return 'A-';
-  if(p >= 87) return 'B+';
-  if(p >= 83) return 'B';
-  if(p >= 80) return 'B-';
-  if(p >= 77) return 'C+';
-  if(p >= 73) return 'C';
-  if(p >= 70) return 'C-';
-  if(p >= 67) return 'D+';
-  if(p >= 63) return 'D';
-  if(p >= 60) return 'D-';
-  if(p >= 50) return 'E+';
-  if(p >= 40) return 'E';
-  return 'F';
-}
-
 /* ---------- fallback to find latest examTotals ---------- */
 async function fallbackFindLatestExamTotal(studentId){
   try {
