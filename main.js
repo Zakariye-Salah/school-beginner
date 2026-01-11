@@ -1,5 +1,4 @@
-// main.js (UPDATED: adds loader overlay, rotating messages, responsive PDF tweaks)
-// Keep your original imports
+// main.js (modified: add id hide/show, screenshot button, inline totals & compact header)
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -10,10 +9,11 @@ const message = document.getElementById('message');
 
 const loaderOverlay = document.getElementById('loaderOverlay');
 const loaderMessageEl = document.getElementById('loaderMessage');
+const toggleIdInputBtn = document.getElementById('toggleIdInputBtn');
 
-const publishedListState = {}; // studentId -> { visible: bool, container: DOMElement, selectedExamId: string }
+const publishedListState = {}; // state store
 
-/* ----- LOADER helpers ----- */
+/* loader logic (unchanged) */
 let loaderInterval = null;
 const loaderMessages = [
   'Fadlan sug...',
@@ -27,7 +27,6 @@ function showLoader() {
   if(!loaderOverlay) return;
   loaderOverlay.style.display = 'flex';
   loaderOverlay.setAttribute('aria-hidden','false');
-  // start message cycle
   let idx = 0;
   loaderMessageEl.textContent = loaderMessages[0];
   if(loaderInterval) clearInterval(loaderInterval);
@@ -36,7 +35,6 @@ function showLoader() {
     loaderMessageEl.textContent = loaderMessages[idx];
   }, 2200);
 }
-
 function hideLoader() {
   if(!loaderOverlay) return;
   loaderOverlay.style.display = 'none';
@@ -45,15 +43,13 @@ function hideLoader() {
   loaderMessageEl.textContent = '';
 }
 
-/* ---------- rest of your helpers & functions (unchanged except small PDF tweaks) ---------- */
-
+/* helpers (unchanged) */
 function rankColor(rank){
   if(rank === 1) return '#FFD700';
   if(rank === 2) return '#C0C0C0';
   if(rank === 3) return '#CD7F32';
   return '#111827';
 }
-
 function percentColor(p){
   if(p >= 95) return '#0b8a3e';
   if(p >= 90) return '#26a64b';
@@ -64,9 +60,7 @@ function percentColor(p){
   if(p >= 60) return '#e74c3c';
   return '#c0392b';
 }
-
 function gradeColor(grade){
-  // returns background color for grade badge - keep same
   if(grade === 'A+' ) return '#0b8a3e';
   if(grade === 'A' ) return '#26a64b';
   if(grade === 'A-' ) return '#66d17a';
@@ -76,16 +70,17 @@ function gradeColor(grade){
   if(grade.startsWith('E')) return '#ef4444';
   return '#b91c1c';
 }
-
 function escape(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
 
-/* ---------- render result (improved) ---------- */
+/* ---------- renderResult (updated header, inline totals, mask & screenshot) ---------- */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
+
   const published = doc.publishedAt ? new Date(doc.publishedAt.seconds ? doc.publishedAt.seconds*1000 : doc.publishedAt).toLocaleString() : '';
   const examName = doc.examName || doc.examId || '';
 
+  // detect components (same as before)
   let compsEnabled = doc.components || null;
   if(!compsEnabled){
     compsEnabled = { assignment:false, quiz:false, monthly:false, exam:false };
@@ -100,30 +95,20 @@ async function renderResult(doc, opts = {}) {
     }
   }
 
-  const motherLine = doc.motherName ? `<div style="margin-top:6px"><strong>Ina Hooyo:</strong> ${escape(doc.motherName)}</div>` : '';
-
-  let linkedLabel = doc.linkedExamName || (doc.linkedExamId ? 'Prev' : null);
+  // build compact header (name + id side-by-side)
+  const motherLine = doc.motherName ? `<div style="margin-top:4px;font-size:0.92rem"><strong>Ina Hooyo:</strong> ${escape(doc.motherName)}</div>` : '';
   const examLabel = examName || 'Exam';
 
-  const moreBtnId = `moreExamsBtn_${escape(String(doc.studentId))}`;
-  let html = `<div class="card result-card" style="padding:16px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.06);">
-    <h2 style="margin:0 0 8px 0;font-size:1.4rem;color:#0f172a">${escape(doc.studentName || 'Magac aan la garanayn')}</h2>
-    ${motherLine}
-    <div style="color:#6b7280;margin-top:6px;font-size:0.95rem">ID: <strong>${escape(doc.studentId)}</strong> | Class: <strong>${escape(doc.className || doc.classId || '')}</strong></div>
-    <div style="margin-top:8px;color:#374151;font-size:0.95rem"><strong>Exam:</strong> ${escape(examLabel)} ${doc.examId?`(<small style="color:#6b7280">${escape(doc.examId)}</small>)`:''}</div>
-    <div style="margin-top:4px;color:#9ca3af;font-size:0.85rem">Published: ${escape(published)}</div>`;
-
-  if(opts.source) html += `<div style="margin-top:6px;color:#6b7280;font-size:0.85rem">Source: ${escape(opts.source)}</div>`;
-
-  // table header
-  html += `<div style="overflow:auto;margin-top:12px"><table style="width:100%;border-collapse:collapse;font-family:inherit"><thead><tr style="background:#f8fafc"><th style="text-align:left;padding:8px 10px">Subject</th>`;
+  // generate table HTML exactly like before (unchanged)
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
-  if(hasLinked) html += `<th id="linkedHeader" style="text-align:center;padding:8px 10px">${escape(linkedLabel || 'Prev')}</th>`;
-  if(compsEnabled.assignment) html += `<th style="text-align:center;padding:8px 10px">Assignment</th>`;
-  if(compsEnabled.quiz) html += `<th style="text-align:center;padding:8px 10px">Quiz</th>`;
-  if(compsEnabled.monthly) html += `<th style="text-align:center;padding:8px 10px">Monthly</th>`;
-  if(compsEnabled.exam) html += `<th style="text-align:center;padding:8px 10px">${escape(examLabel)}</th>`;
-  html += `<th style="text-align:center;padding:8px 10px">Total</th><th style="text-align:center;padding:8px 10px">Max</th></tr></thead><tbody>`;
+  let tableHtml = `<div style="overflow:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-family:inherit">`;
+  tableHtml += `<thead><tr style="background:#f8fafc"><th style="text-align:left;padding:8px 10px">Subject</th>`;
+  if(hasLinked) tableHtml += `<th style="text-align:center;padding:8px 10px">${escape(doc.linkedExamName || doc.linkedExamId || 'Prev')}</th>`;
+  if(compsEnabled.assignment) tableHtml += `<th style="text-align:center;padding:8px 10px">Assignment</th>`;
+  if(compsEnabled.quiz) tableHtml += `<th style="text-align:center;padding:8px 10px">Quiz</th>`;
+  if(compsEnabled.monthly) tableHtml += `<th style="text-align:center;padding:8px 10px">Monthly</th>`;
+  if(compsEnabled.exam) tableHtml += `<th style="text-align:center;padding:8px 10px">${escape(examLabel)}</th>`;
+  tableHtml += `<th style="text-align:center;padding:8px 10px">Total</th><th style="text-align:center;padding:8px 10px">Max</th></tr></thead><tbody>`;
 
   // rows
   let totGot = 0, totMax = 0;
@@ -142,80 +127,141 @@ async function renderResult(doc, opts = {}) {
         if(comps.exam != null) componentSum += Number(comps.exam);
         else if(s.exam != null) componentSum += Number(s.exam);
       }
-
       const rowTotal = (typeof s.mark !== 'undefined') ? combinedMark : componentSum;
       const rowMax = Number(s.max || 0);
 
-      html += `<tr style="border-bottom:1px solid #eef2f7"><td style="padding:8px 10px">${escape(s.name)}</td>`;
+      tableHtml += `<tr style="border-bottom:1px solid #eef2f7"><td style="padding:8px 10px">${escape(s.name)}</td>`;
       if(hasLinked){
         const prevVal = (s.components && s.components.linked && (typeof s.components.linked.total !== 'undefined')) ? s.components.linked.total : (s.components && typeof s.components.linked === 'number' ? s.components.linked : '-');
-        html += `<td style="text-align:center;padding:8px 10px">${escape(String(prevVal != null ? prevVal : '-'))}</td>`;
+        tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String(prevVal != null ? prevVal : '-'))}</td>`;
       }
-
-      if(compsEnabled.assignment) html += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.assignment != null) ? comps.assignment : (s.assignment != null ? s.assignment : '-')))}</td>`;
-      if(compsEnabled.quiz)       html += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.quiz != null) ? comps.quiz : (s.quiz != null ? s.quiz : '-')))}</td>`;
-      if(compsEnabled.monthly)    html += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.monthly != null) ? comps.monthly : (s.monthly != null ? s.monthly : '-')))}</td>`;
-      if(compsEnabled.exam)       html += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.exam != null) ? comps.exam : (s.exam != null ? s.exam : '-')))}</td>`;
-
-      html += `<td style="text-align:center;padding:8px 10px">${escape(String(rowTotal))}</td><td style="text-align:center;padding:8px 10px">${escape(String(rowMax||''))}</td></tr>`;
+      if(compsEnabled.assignment) tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.assignment != null) ? comps.assignment : (s.assignment != null ? s.assignment : '-')))}</td>`;
+      if(compsEnabled.quiz)       tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.quiz != null) ? comps.quiz : (s.quiz != null ? s.quiz : '-')))}</td>`;
+      if(compsEnabled.monthly)    tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.monthly != null) ? comps.monthly : (s.monthly != null ? s.monthly : '-')))}</td>`;
+      if(compsEnabled.exam)       tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String((comps.exam != null) ? comps.exam : (s.exam != null ? s.exam : '-')))}</td>`;
+      tableHtml += `<td style="text-align:center;padding:8px 10px">${escape(String(rowTotal))}</td><td style="text-align:center;padding:8px 10px">${escape(String(rowMax||''))}</td></tr>`;
 
       totGot += Number(rowTotal||0); totMax += Number(rowMax||0);
     }
   }
+  tableHtml += `</tbody></table></div>`;
 
-  html += `</tbody></table></div>`;
-
-  // totals block
+  // totals calculation (same)
   const total = typeof doc.total !== 'undefined' ? Number(doc.total) : totGot;
   const averageRaw = typeof doc.average !== 'undefined' ? Number(doc.average) : ( (doc.subjects && doc.subjects.length) ? (total / doc.subjects.length) : 0 );
   const sumMax = totMax;
-
   const percent = sumMax ? (total / sumMax * 100) : 0;
   const grade = gradeForPercent(percent);
   const passfail = percent >= 50 ? 'Gudbay' : 'Dhacay';
   const percentCol = percentColor(percent);
   const gradeBg = gradeColor(grade);
 
-  const schoolRankText = doc.schoolRank ? `${escape(String(doc.schoolRank))}` : '/—';
-  const classRankText = doc.classRank ? `${escape(String(doc.classRank))}` : '/—';
+  // inline totals: single-line items
+  const totalsHtml = `<div id="totalsInline" class="tiny">
+      <span class="tot-item">Total: <strong style="color:#2459ff">${escape(String(total))}</strong> / <span style="color:green">${escape(String(sumMax))}</span></span>
+      <span class="tot-item">Percent: <strong style="color:${percentCol}">${percent.toFixed(2)}%</strong></span>
+      <span class="tot-item">Average: <strong>${Number(averageRaw).toFixed(2)}</strong></span>
+      <span class="tot-item">Grade: <span id="gradeBadge" style="background:${gradeBg}">${grade}</span></span>
+      <span class="tot-item">Status: <strong style="color:${percent>=50 ? '#0b8a3e' : '#c0392b'}">${escape(passfail)}</strong></span>
+      <span class="tot-item">School rank: <strong id="schoolRankCell">${escape(String(doc.schoolRank || '/—'))}</strong></span>
+      <span class="tot-item">Class rank: <strong id="classRankCell">${escape(String(doc.classRank || '/—'))}</strong></span>
+    </div>`;
 
-  html += `<div id="totalsBlock" style="margin-top:12px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-    <div><strong>Total:</strong> <span style="color:blue;font-weight:700">${escape(String(total))}</span> / <span style="color:green">${escape(String(sumMax))}</span></div>
-    <div><strong>Percent:</strong> <span style="color:${percentCol};font-weight:700">${percent.toFixed(2)}%</span></div>
-    <div><strong>Average:</strong> <span style="color:${percentColor(averageRaw)};font-weight:700">${Number(averageRaw).toFixed(2)}</span></div>
-    <div><strong>Grade:</strong> <span id="gradeBadge" style="background:${gradeBg};color:#fff;padding:6px 10px;border-radius:8px;font-weight:800">${grade}</span></div>
-    <div><strong>Status:</strong> <span style="color:${percent>=50 ? '#0b8a3e' : '#c0392b'}; font-weight:700">${escape(passfail)}</span></div>
+  // actions (PDF + more + screenshot)
+  const actionsHtml = `<div class="result-actions">
+      <button id="printBtn" class="btn btn-primary"><svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9H18V4H6V9Z" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Daabac (PDF)</button>
+      <button id="${`moreExamsBtn_${escape(String(doc.studentId))}`}" class="btn btn-ghost">More published exams</button>
+      <button id="screenshotBtn" class="btn"><svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 7A5 5 0 1 0 12 17A5 5 0 0 0 12 7Z" stroke="currentColor" stroke-width="1.2" fill="none"></path><path d="M3 3H7L8 6H16L17 3H21" stroke="currentColor" stroke-width="1.2" fill="none"></path></svg>Screenshot</button>
+    </div>`;
+
+  // header: name + id + exam + published + source (name slanted)
+  const headerHtml = `<div class="card" style="padding:12px 14px">
+    <div class="result-header">
+      <div class="student-name slanted" id="studentNameText">${escape(doc.studentName || 'Magac aan la garanayn')}</div>
+      <div class="student-meta" style="gap:6px">
+        <div>ID: <span id="studentIdText" style="font-weight:700">${escape(doc.studentId)}</span></div>
+        <button id="maskIdBtn" class="btn" style="padding:4px 8px;font-size:0.85rem">👁‍🗨</button>
+        <div>Class: <strong>${escape(doc.className || doc.classId || '')}</strong></div>
+        <div style="color:#6b7280">Exam: <strong>${escape(examLabel)}</strong></div>
+      </div>
+    </div>
+    ${motherLine}
+    <div style="margin-top:6px;color:#9ca3af;font-size:0.85rem">Published: ${escape(published)} &nbsp; Source: ${escape(opts.source || '')}</div>
   </div>`;
 
-  html += `<div id="ranksBlock" style="margin-top:10px;font-weight:600">
-    <span id="schoolRankCell" style="${doc.schoolRank ? `color:${rankColor(doc.schoolRank)};font-weight:700` : ''}">School rank: ${schoolRankText}</span>
-    &nbsp;&nbsp;
-    <span id="classRankCell" style="font-weight:600">Class rank: ${classRankText}</span>
-  </div>`;
+  // now compose the big HTML
+  resultArea.innerHTML = headerHtml + tableHtml + totalsHtml + actionsHtml;
 
-  html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-    <button id="printBtn" class="btn btn-primary" style="padding:8px 12px;border-radius:8px">Daabac (PDF)</button>
-    <button id="${moreBtnId}" class="btn btn-ghost" style="padding:8px 12px;border-radius:8px">More published exams</button>
-  </div>`;
-
-  html += `</div>`; // close card
-
-  resultArea.innerHTML = html;
-
-  // hide loader if present
+  // hide loader
   hideLoader();
 
-  // wire print -> PDF generation (tighter margins & smaller fonts to fit)
+  // --- ID mask toggle (for the displayed ID) ---
+  const maskBtn = document.getElementById('maskIdBtn');
+  const idTextEl = document.getElementById('studentIdText');
+  let idMasked = true; // default masked to protect id by default
+  const originalId = idTextEl ? idTextEl.textContent : '';
+  function renderIdMask() {
+    if(!idTextEl) return;
+    if(idMasked){
+      // show partial mask: keep last 3 chars if available
+      const s = originalId || '';
+      if(s.length <= 3) idTextEl.textContent = '*'.repeat(s.length);
+      else idTextEl.textContent = '*'.repeat(Math.max(0, s.length - 3)) + s.slice(-3);
+      maskBtn.textContent = '👁'; // show-eye icon meaning "show"
+    } else {
+      idTextEl.textContent = originalId;
+      maskBtn.textContent = '🙈'; // hide-eye icon meaning "hide"
+    }
+  }
+  if(maskBtn){
+    maskBtn.onclick = () => { idMasked = !idMasked; renderIdMask(); };
+    renderIdMask();
+  }
+
+  // Also add a toggle for the small "input" hide/show (the earlier toggle button by the input)
+  if(toggleIdInputBtn){
+    // initial: visible (text). clicking toggles type "password"/"text" on the input element
+    let inputHidden = false;
+    toggleIdInputBtn.onclick = () => {
+      inputHidden = !inputHidden;
+      studentIdInput.type = inputHidden ? 'password' : 'text';
+      toggleIdInputBtn.textContent = inputHidden ? '👁‍🗨' : '🔓';
+    };
+  }
+
+  // --- screenshot button: capture the card area (student name + results) ---
+  const screenshotBtn = document.getElementById('screenshotBtn');
+  if(screenshotBtn){
+    screenshotBtn.onclick = async () => {
+      // capture only the first result-card(s) area: header + table + totals
+      // create a temporary wrapper so we capture only what we want
+      const captureEl = resultArea; // resultArea contains header + table + totals
+      try {
+        // use html2canvas (loaded via CDN)
+        const canvas = await window.html2canvas(captureEl, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        const safeName = (doc.studentName || doc.studentId || 'result').replace(/\s+/g,'_');
+        a.download = `${safeName}_result.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch(e){
+        console.error('Screenshot failed', e);
+        alert('Screenshot failed — isku day mar kale.');
+      }
+    };
+  }
+
+  // --- PDF button (kept your existing logic mostly) ---
   document.getElementById('printBtn').onclick = async () => {
     try {
       if(!(window.jspdf && window.jspdf.jsPDF)) throw new Error('jsPDF not available');
       const { jsPDF } = window.jspdf;
-      // use landscape only if many columns; else portrait - pick portrait for better readability on mobile
       const docPdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-      const margin = 20; // smaller margins to pack content
+      const margin = 20;
       let cursorY = margin;
-
-      // header (smaller font sizes)
       docPdf.setFontSize(12);
       docPdf.text(`${doc.studentName || ''}`, margin, cursorY);
       docPdf.setFontSize(9);
@@ -226,11 +272,10 @@ async function renderResult(doc, opts = {}) {
       docPdf.text(`Source: ${opts.source || ''}`, margin, cursorY + 80);
       cursorY += 96;
 
-      // build columns for autotable
+      // columns + table creation (same as before)
       const subjectCols = [];
       subjectCols.push({ header: 'Subject', dataKey: 'subject' });
-      const hasLinkedCol = hasLinked;
-      if(hasLinkedCol) subjectCols.push({ header: (doc.linkedExamName || linkedLabel || 'Prev'), dataKey: 'linked' });
+      if(hasLinked) subjectCols.push({ header: (doc.linkedExamName || 'Prev'), dataKey: 'linked' });
       if(compsEnabled.assignment) subjectCols.push({ header: 'Assignment', dataKey: 'assignment' });
       if(compsEnabled.quiz) subjectCols.push({ header: 'Quiz', dataKey: 'quiz' });
       if(compsEnabled.monthly) subjectCols.push({ header: 'Monthly', dataKey: 'monthly' });
@@ -241,7 +286,7 @@ async function renderResult(doc, opts = {}) {
       const tableData = (doc.subjects||[]).map(s => {
         const comps = s.components || {};
         const obj = { subject: s.name };
-        if(hasLinkedCol) obj.linked = (s.components && s.components.linked && typeof s.components.linked.total !== 'undefined') ? String(s.components.linked.total) : ((typeof s.components?.linked === 'number') ? String(s.components.linked) : '-');
+        if(hasLinked) obj.linked = (s.components && s.components.linked && typeof s.components.linked.total !== 'undefined') ? String(s.components.linked.total) : ((typeof s.components?.linked === 'number') ? String(s.components.linked) : '-');
         if(compsEnabled.assignment) obj.assignment = (comps.assignment != null) ? String(comps.assignment) : (s.assignment != null ? String(s.assignment) : '-');
         if(compsEnabled.quiz) obj.quiz = (comps.quiz != null) ? String(comps.quiz) : (s.quiz != null ? String(s.quiz) : '-');
         if(compsEnabled.monthly) obj.monthly = (comps.monthly != null) ? String(comps.monthly) : (s.monthly != null ? String(s.monthly) : '-');
@@ -251,7 +296,6 @@ async function renderResult(doc, opts = {}) {
         return obj;
       });
 
-      // autotable with small font and compact cell padding
       docPdf.autoTable({
         startY: cursorY,
         head: [subjectCols.map(c => c.header)],
@@ -267,21 +311,18 @@ async function renderResult(doc, opts = {}) {
       docPdf.text(`Total: ${total} / ${sumMax}`, margin, footY);
       docPdf.text(`Percent: ${percent.toFixed(2)}%`, margin + 200, footY);
       docPdf.text(`Average: ${Number(averageRaw).toFixed(2)}`, margin + 320, footY);
-
-      // grade box small
       docPdf.setFillColor( parseInt(gradeBg.slice(1,3),16), parseInt(gradeBg.slice(3,5),16), parseInt(gradeBg.slice(5,7),16) );
       docPdf.rect(margin + 420, footY - 8, 36, 16, 'F');
       docPdf.setTextColor(255,255,255);
       docPdf.text(`${grade}`, margin + 428, footY + 4);
       docPdf.setTextColor(0,0,0);
 
-      // ranks counts: attempt to fetch counts and append to PDF (try/catch)
+      // ranks append (attempt)
       if(doc.examId){
         try {
           const qAll = query(collection(db,'examTotals'), where('examId','==', doc.examId));
           const snapAll = await getDocs(qAll);
           const schoolSize = snapAll.size || 0;
-
           let classSize = 0;
           if(doc.classId){
             snapAll.forEach(d => {
@@ -289,12 +330,9 @@ async function renderResult(doc, opts = {}) {
               if(data.classId === doc.classId) classSize++;
             });
           }
-
           docPdf.text(`School rank: ${doc.schoolRank ? doc.schoolRank + ' / ' + schoolSize : '/—'}`, margin, footY + 24);
           docPdf.text(`Class rank: ${doc.classRank ? doc.classRank + ' / ' + classSize : '/—'}`, margin + 200, footY + 24);
-        } catch(e){
-          // ignore
-        }
+        } catch(e){ /* ignore */ }
       }
 
       const fname = `${(doc.studentName || doc.studentId || 'result').replace(/\s+/g,'_')}_${(doc.examName || 'exam').replace(/\s+/g,'_')}.pdf`;
@@ -307,32 +345,17 @@ async function renderResult(doc, opts = {}) {
     }
   };
 
-  // wire "More published exams" toggle
-  const moreBtn = document.getElementById(moreBtnId);
-  moreBtn.onclick = () => togglePublishedList(doc.studentId);
+  // wire "More published exams" toggle (keeps original behavior)
+  const moreBtn = document.getElementById(`moreExamsBtn_${CSS.escape(String(doc.studentId))}`);
+  if(moreBtn) moreBtn.onclick = () => togglePublishedList(doc.studentId);
 
-  // If doc contains linkedExamId but not linkedExamName, try to fetch exam doc name and update header label
-  if(!doc.linkedExamName && doc.linkedExamId){
-    (async ()=>{
-      try {
-        const exSnap = await getDoc(doc(db,'exams', doc.linkedExamId));
-        if(exSnap.exists()){
-          const name = exSnap.data().name || null;
-          const el = document.getElementById('linkedHeader');
-          if(el && name) el.textContent = name;
-        }
-      } catch(e){ /* ignore */ }
-    })();
-  }
-
-  // update school/class rank counts on the page (async)
+  // update school/class ranks asynchronously (original logic preserved)
   if(doc.examId){
     (async ()=>{
       try {
         const qAll = query(collection(db,'examTotals'), where('examId','==', doc.examId));
         const snapAll = await getDocs(qAll);
         const schoolSize = snapAll.size || 0;
-
         let classSize = 0;
         if(doc.classId){
           snapAll.forEach(d => {
@@ -340,16 +363,15 @@ async function renderResult(doc, opts = {}) {
             if(data.classId === doc.classId) classSize++;
           });
         }
-
         const schoolRankCell = document.getElementById('schoolRankCell');
         const classRankCell = document.getElementById('classRankCell');
         if(schoolRankCell){
-          if(doc.schoolRank && schoolSize) schoolRankCell.textContent = `School rank: ${escape(String(doc.schoolRank))} / ${escape(String(schoolSize))}`;
-          else if(doc.schoolRank) schoolRankCell.textContent = `School rank: ${escape(String(doc.schoolRank))}`;
+          if(doc.schoolRank && schoolSize) schoolRankCell.textContent = `${escape(String(doc.schoolRank))} / ${escape(String(schoolSize))}`;
+          else if(doc.schoolRank) schoolRankCell.textContent = `${escape(String(doc.schoolRank))}`;
         }
         if(classRankCell){
-          if(doc.classRank && classSize) classRankCell.textContent = `Class rank: ${escape(String(doc.classRank))} / ${escape(String(classSize))}`;
-          else if(doc.classRank) classRankCell.textContent = `Class rank: ${escape(String(doc.classRank))}`;
+          if(doc.classRank && classSize) classRankCell.textContent = `${escape(String(doc.classRank))} / ${escape(String(classSize))}`;
+          else if(doc.classRank) classRankCell.textContent = `${escape(String(doc.classRank))}`;
         }
       } catch(e){
         console.warn('Rank count fetch failed', e);
@@ -357,6 +379,7 @@ async function renderResult(doc, opts = {}) {
     })();
   }
 }
+
 
 /* togglePublishedList: shows/hides the published exam list */
 async function togglePublishedList(studentId){
@@ -543,3 +566,5 @@ searchBtn.onclick = async () => {
     hideLoader();
   }
 };
+
+export { renderResult }; // export for clarity if needed (optional)
