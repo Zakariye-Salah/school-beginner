@@ -9,7 +9,6 @@ const message = document.getElementById('message');
 const loaderOverlay = document.getElementById('loaderOverlay');
 const loaderMessageEl = document.getElementById('loaderMessage');
 const toggleIdInputBtn = document.getElementById('toggleIdInputBtn');
-const toggleInputIcon = document.getElementById('toggleInputIcon');
 
 let loaderInterval = null;
 const loaderMessages = ['Fadlan sug...','Waxaan hubineynaa xogta...','Waxaa la soo rarayaa natiijooyinka...'];
@@ -35,7 +34,31 @@ function gradeColor(g){
   if(g.startsWith('B')) return '#3b82f6'; if(g.startsWith('C')) return '#f59e0b'; return '#b91c1c';
 }
 
-/* ---------- renderResult: header exactly as requested, table without dot truncation, totals layout ---------- */
+/* ---------- Make the input toggle work immediately (before search) ---------- */
+(function wireInputToggleNow(){
+  if(!toggleIdInputBtn || !studentIdInput) return;
+  let hidden = false;
+  toggleIdInputBtn.addEventListener('click', () => {
+    hidden = !hidden;
+    studentIdInput.type = hidden ? 'password' : 'text';
+    // swap icon (simple swap of path — replace innerHTML)
+    if(hidden){
+      toggleIdInputBtn.innerHTML = `
+        <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- eye closed -->
+          <path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/>
+        </svg>`;
+    } else {
+      toggleIdInputBtn.innerHTML = `
+        <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/>
+        </svg>`;
+    }
+  });
+})();
+
+/* ---------- renderResult ---------- */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -56,7 +79,7 @@ async function renderResult(doc, opts = {}) {
     }
   }
 
-  // Build table HTML (no dots truncation - header wraps)
+  // Build table HTML
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
   let tableHtml = `<div class="card"><div style="overflow:auto"><table><thead><tr><th>Subject</th>`;
   if(hasLinked) tableHtml += `<th>${escapeHtml(doc.linkedExamName || 'Prev')}</th>`;
@@ -97,18 +120,17 @@ async function renderResult(doc, opts = {}) {
   }
   tableHtml += `</tbody></table></div></div>`;
 
-  // totals calculations
+  // totals
   const total = typeof doc.total !== 'undefined' ? Number(doc.total) : totGot;
   const averageRaw = typeof doc.average !== 'undefined' ? Number(doc.average) : ((doc.subjects && doc.subjects.length) ? (total / doc.subjects.length) : 0);
   const sumMax = totMax;
   const percent = sumMax ? (total / sumMax * 100) : 0;
-  const percentShort = Math.round(percent); // short display for tiny screens
   const grade = gradeForPercent(percent);
   const passfail = percent >= 50 ? 'Gudbay' : 'Dhacay';
   const percentCol = percentColor(percent);
   const gradeBg = gradeColor(grade);
 
-  // header: top school name, student name + id + mask, then class and exam labels, mother, published + source
+  // header layout: school name, student name + ID (masked toggle), then class & exam on one row (exam wraps if long), mother, published+source on single row
   const schoolName = 'Al-Fatxi Primary & Secondary School';
   const studentName = escapeHtml(doc.studentName || 'Magac aan la garanayn');
   const studentIdRaw = escapeHtml(doc.studentId || '');
@@ -116,38 +138,40 @@ async function renderResult(doc, opts = {}) {
   const examLabel = escapeHtml(examName || '');
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
+  // Build header HTML (class + exam on one row; exam can wrap)
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
       <div class="result-header">
         <div class="header-top">
-          <div class="student-line">
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
             <div class="student-name">${studentName}</div>
             <div class="meta-inline">
               <div class="label">ID:</div>
               <div id="studentIdText" style="font-weight:900">${studentIdRaw}</div>
               <button id="maskIdBtn" class="btn" title="Toggle displayed ID" style="padding:6px 8px">
-                <!-- eye open initially hidden state will be applied in JS -->
                 <svg id="eyeOpen" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/></svg>
                 <svg id="eyeClosed" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2"/><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/></svg>
               </button>
             </div>
           </div>
 
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div class="label">Class: <strong style="font-weight:900">${className}</strong></div>
-            <div class="label">Exam: <strong style="font-weight:900">${examLabel}</strong></div>
+          <!-- CLASS + EXAM: one line; exam will wrap if long -->
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;max-width:45%;text-align:right;justify-content:flex-end">
+            <div style="white-space:nowrap">Class: <strong style="font-weight:900">${className}</strong></div>
+            <div style="max-width:220px;word-wrap:break-word;text-align:right">Exam: <strong style="font-weight:900">${examLabel}</strong></div>
           </div>
         </div>
 
         <div style="margin-top:6px">
           ${mother ? `<div><strong>Ina Hooyo:</strong> ${mother}</div>` : ''}
+          <!-- published + source on single row -->
           <div style="margin-top:4px;color:var(--muted)">${escapeHtml('Published:')} ${escapeHtml(published)} &nbsp;&nbsp; Source: AL-Fatxi School</div>
         </div>
       </div>
     </div>`;
 
-  // totals (4 lines) as requested
+  // totals block & actions
   const totalsHtml = `
     <div class="totals-card card">
       <div class="totals-block">
@@ -159,7 +183,6 @@ async function renderResult(doc, opts = {}) {
 
       <div class="actions-group" id="actionsGroup">
         <button id="printBtn" class="btn btn-primary" title="Download PDF" style="min-width:170px;font-size:15px">
-          <!-- print icon -->
           <svg class="icon" viewBox="0 0 24 24"><path d="M6 9h12V4H6v5zM6 13h12v-1H6v1zM6 15h12v5H6v-5z" fill="#fff"/></svg> Daabac (PDF)
         </button>
 
@@ -173,10 +196,9 @@ async function renderResult(doc, opts = {}) {
 
   resultArea.innerHTML = headerHtml + tableHtml + totalsHtml;
 
-  // hide loader
   hideLoader();
 
-  /* ---------- mask ID toggle for the displayed ID ---------- */
+  /* ---------- mask ID toggle (display) ---------- */
   const maskBtn = document.getElementById('maskIdBtn');
   const studentIdText = document.getElementById('studentIdText');
   const eyeOpen = document.getElementById('eyeOpen');
@@ -188,28 +210,13 @@ async function renderResult(doc, opts = {}) {
     if(masked){
       const s = originalId || '';
       studentIdText.textContent = s.length>3 ? '*'.repeat(Math.max(0,s.length-3)) + s.slice(-3) : '*'.repeat(s.length);
-      eyeOpen.style.display = 'none';
-      eyeClosed.style.display = 'inline-block';
+      if(eyeOpen) eyeOpen.style.display='none'; if(eyeClosed) eyeClosed.style.display='inline-block';
     } else {
       studentIdText.textContent = originalId;
-      eyeOpen.style.display = 'inline-block';
-      eyeClosed.style.display = 'none';
+      if(eyeOpen) eyeOpen.style.display='inline-block'; if(eyeClosed) eyeClosed.style.display='none';
     }
   }
   if(maskBtn){ maskBtn.addEventListener('click', ()=>{ masked = !masked; applyMask(); }); applyMask(); }
-
-  /* ---------- toggle for the input visibility (before Raadi) ---------- */
-  if(toggleIdInputBtn){
-    let hidden = false;
-    toggleIdInputBtn.addEventListener('click', ()=>{
-      hidden = !hidden;
-      studentIdInput.type = hidden ? 'password' : 'text';
-      // swap the input icon visually: use a simple swap (two paths)
-      if(originalId){ /* just change stroke color or show/hide bits for clarity */ }
-      // flip small icon by rotating it for a visible change
-      toggleInputIcon.style.transform = hidden ? 'rotate(180deg)' : 'none';
-    });
-  }
 
   /* ---------- screenshot (hide action buttons while capturing) ---------- */
   const screenshotBtn = document.getElementById('screenshotBtn');
@@ -217,10 +224,9 @@ async function renderResult(doc, opts = {}) {
   if(screenshotBtn){
     screenshotBtn.onclick = async () => {
       try {
-        // hide actions to avoid showing them
         if(actionsGroup) actionsGroup.style.visibility = 'hidden';
         const el = resultArea;
-        const canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const dataUrl = canvas.toDataURL('image/png');
         const a = document.createElement('a');
         a.href = dataUrl;
@@ -234,7 +240,7 @@ async function renderResult(doc, opts = {}) {
     };
   }
 
-  /* ---------- PDF generation (larger fonts and spacing) ---------- */
+  /* ---------- PDF generation (bigger fonts, smaller paddings) ---------- */
   const printBtn = document.getElementById('printBtn');
   if(printBtn){
     printBtn.onclick = async () => {
@@ -242,12 +248,13 @@ async function renderResult(doc, opts = {}) {
         if(!(window.jspdf && window.jspdf.jsPDF)) throw new Error('jsPDF not available');
         const { jsPDF } = window.jspdf;
         const docPdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const margin = 26; let y = margin;
-        docPdf.setFontSize(16); docPdf.text(schoolName, margin, y); y += 22;
-        docPdf.setFontSize(12); docPdf.text(`${doc.studentName || ''}    ID: ${doc.studentId || ''}`, margin, y); y += 18;
-        if(mother) { docPdf.setFontSize(11); docPdf.text(`Ina Hooyo: ${mother}`, margin, y); y += 16; }
-        docPdf.setFontSize(11); docPdf.text(`Class: ${className}    Exam: ${examLabel}`, margin, y); y += 18;
-        docPdf.text(`Published: ${published}    Source: AL-Fatxi School`, margin, y); y += 20;
+        const margin = 20; let y = margin;
+        // larger overall fonts (you requested ~15px look)
+        docPdf.setFontSize(18); docPdf.text(schoolName, margin, y); y += 24;
+        docPdf.setFontSize(15); docPdf.text(`${doc.studentName || ''}    ID: ${doc.studentId || ''}`, margin, y); y += 20;
+        if(mother) { docPdf.setFontSize(13); docPdf.text(`Ina Hooyo: ${mother}`, margin, y); y += 18; }
+        docPdf.setFontSize(13); docPdf.text(`Class: ${className}    Exam: ${examLabel}`, margin, y); y += 20;
+        docPdf.setFontSize(12); docPdf.text(`Published: ${published}    Source: AL-Fatxi School`, margin, y); y += 20;
 
         // build columns
         const cols = [];
@@ -276,17 +283,17 @@ async function renderResult(doc, opts = {}) {
           startY: y,
           head: [cols.map(c=>c.header)],
           body: tableData.map(r => cols.map(c => r[c.dataKey] || '')),
-          styles: { fontSize: 10, cellPadding: 6 },
+          styles: { fontSize: 12, cellPadding: 6 }, // slightly larger font, small padding
           headStyles: { fillColor: [240,240,240], textColor: [20,20,20], fontStyle: 'bold' },
           margin: { left: margin, right: margin }
         });
 
         const finalY = docPdf.lastAutoTable ? docPdf.lastAutoTable.finalY + 18 : docPdf.internal.pageSize.getHeight() - 80;
-        docPdf.setFontSize(12);
+        docPdf.setFontSize(13);
         docPdf.text(`Total: ${total} / ${sumMax}    Percent: ${percent.toFixed(2)}%`, margin, finalY);
-        docPdf.text(`Average: ${Number(averageRaw).toFixed(2)}    Grade: ${grade}`, margin, finalY + 16);
-        docPdf.text(`Status: ${passfail}`, margin, finalY + 32);
-        docPdf.text(`School rank: ${doc.schoolRank || '/—'}    Class rank: ${doc.classRank || '/—'}`, margin, finalY + 48);
+        docPdf.text(`Average: ${Number(averageRaw).toFixed(2)}    Grade: ${grade}`, margin, finalY + 18);
+        docPdf.text(`Status: ${passfail}`, margin, finalY + 36);
+        docPdf.text(`School rank: ${doc.schoolRank || '/—'}    Class rank: ${doc.classRank || '/—'}`, margin, finalY + 54);
 
         const fname = `${(doc.studentName || doc.studentId || 'result').replace(/\s+/g,'_')}_result.pdf`;
         docPdf.save(fname);
@@ -297,7 +304,7 @@ async function renderResult(doc, opts = {}) {
     };
   }
 
-  // wire More button -> published list
+  // wire More published button
   const moreBtn = document.getElementById('moreExamsBtn');
   if(moreBtn) moreBtn.onclick = () => togglePublishedList(doc.studentId);
 
@@ -320,7 +327,7 @@ async function renderResult(doc, opts = {}) {
   }
 }
 
-/* ---------- togglePublishedList (keeps original behavior) ---------- */
+/* ---------- togglePublishedList ---------- */
 const publishedListState = {};
 async function togglePublishedList(studentId){
   if(!studentId) return;
@@ -364,7 +371,7 @@ async function togglePublishedList(studentId){
   }
 }
 
-/* ---------- fallbackFindLatestExamTotal ---------- */
+/* ---------- fallback ----- */
 async function fallbackFindLatestExamTotal(studentId){
   try{
     const q = query(collection(db,'examTotals'), where('studentId','==', studentId));
@@ -377,7 +384,7 @@ async function fallbackFindLatestExamTotal(studentId){
   }catch(e){ console.error(e); return null; }
 }
 
-/* ---------- main search click (keeps your logic) ---------- */
+/* ---------- main search click ---------- */
 searchBtn.onclick = async () => {
   const studentId = studentIdInput.value.trim();
   message.textContent = '';
