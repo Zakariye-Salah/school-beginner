@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="so">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Alfatxi School — Results</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* small local styles so the result UI looks decent without extra CSS edits */
+    body { font-family: Inter, system-ui, Arial, sans-serif; background:#fbfdff; color:#0f172a; }
+    .card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 6px 18px rgba(15,23,42,0.04); margin-bottom:12px; }
+    .btn { cursor:pointer; border:1px solid #dbeafe; background:#fff; padding:6px 10px; border-radius:8px; }
+    .btn-primary { background:#0b74ff; color:#fff; border-color:#0b74ff; }
+    .btn-ghost { background:#fff; color:#0f172a; border-color:#e6eefc; }
+    input#studentId { width:100%; padding:8px; margin-top:6px; border-radius:8px; border:1px solid #e6eefc; }
+    table.table { width:100%; border-collapse:collapse; }
+    .card h2 { margin:0; }
+  </style>
+</head>
+<body>
+  <div style="max-width:900px;margin:20px auto">
+    <h1>Soo dhawoow, arday!</h1>
+    <p>Fadlan geli aqoonsigaaga (ID) si aad u aragto natiijooyinka.</p>
+
+    <div class="card">
+      <label for="studentId">Geli ID-gaaga halkan</label>
+      <input id="studentId" placeholder="12345" />
+      <div style="margin-top:8px">
+        <button id="searchBtn" class="btn btn-primary">Raadi</button>
+      </div>
+      <div id="message" style="color:#c00;margin-top:8px"></div>
+    </div>
+
+    <div id="resultArea" style="display:none; margin-top:18px"></div>
+  </div>
+
+  <!-- add these before loading main.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
