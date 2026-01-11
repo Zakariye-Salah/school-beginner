@@ -29,24 +29,34 @@
     /* Result header */
     .result-school { font-weight:900; font-size:1rem; margin-bottom:6px }
     .result-header { display:flex; flex-direction:column; gap:6px; }
-    .header-top { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap }
+    .header-top { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:nowrap }
     .student-line { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
     .student-name { font-size:1.18rem; font-weight:900; font-style:italic; transform:skewX(-2deg) }
 
     .meta-inline { color:var(--muted); display:flex; gap:10px; align-items:center; font-weight:700; font-size:0.95rem }
     .meta-inline .label { color:var(--muted); font-weight:700 }
 
+    /* new header-right: keep class+exam on the same row, allow exam to wrap inside its box */
+    .header-right { display:flex; gap:12px; align-items:center; justify-content:flex-end; white-space:nowrap; }
+    .header-right .class-line { white-space:nowrap; font-weight:700; }
+    .header-right .exam-line { max-width:260px; text-align:right; word-wrap:break-word; overflow-wrap:break-word; white-space:normal; }
+
     /* Table */
     #resultArea table { width:100%; border-collapse:collapse; font-family:inherit; }
     #resultArea thead tr { background:#f8fafc }
     /* subject header slightly bigger than others; other headers small (12px) */
-    #resultArea th { font-weight:800; text-align:center; white-space:normal; font-size:12px; }
-    #resultArea th:first-child { font-size:13px; text-align:left; }
-    #resultArea td { font-weight:700; text-align:center; font-size:13px; }
-    #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; }
+    /* reduced padding to make headers tighter */
+    #resultArea th { font-weight:800; text-align:center; white-space:normal; font-size:12px; padding:6px 8px; }
+    #resultArea th:first-child { font-size:13px; text-align:left; padding-left:8px; }
+    #resultArea td { font-weight:700; text-align:center; font-size:13px; padding:6px 8px; }
+    #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; padding-left:8px; }
 
     /* numeric columns compact and no-wrap */
-    #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; width:6ch; }
+    /* shrink numeric columns (less space) */
+    #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; width:5ch; padding:6px 6px; }
+
+    /* allow header text (th) that has two words to wrap into two lines (no ellipsis) */
+    #resultArea th:not(:first-child) { white-space:normal; word-break:break-word; overflow-wrap:break-word; }
 
     /* Totals layout (4 lines) */
     .totals-card { margin-top:12px; padding:12px; border-radius:10px; }
@@ -67,6 +77,9 @@
     @keyframes jump{0%{transform:translateY(0)}25%{transform:translateY(-6px)}50%{transform:translateY(0)}}
 
     /* responsive tweaks */
+    @media (max-width:760px){
+      .header-right { max-width: 48%; } /* leave space so header doesn't overflow */
+    }
     @media (max-width:540px){
       :root{--tiny-size:9px;--btn-font:14px}
       .student-name{font-size:1.02rem}
@@ -74,7 +87,9 @@
       #resultArea td{font-size:12px}
       .grade-badge{font-size:0.9rem;padding:5px 8px}
       .btn{font-size:14px;padding:8px 10px;border-radius:9px}
-      #resultArea td:not(:first-child){width:5ch}
+      #resultArea td:not(:first-child){width:4ch}
+      .header-right { max-width: 60%; }
+      .header-right .exam-line { max-width: 160px; } /* allow exam to wrap but not overflow */
     }
 
     /* very small */
