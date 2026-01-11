@@ -103,6 +103,86 @@
       #resultArea table th:not(:first-child), #resultArea table td:not(:first-child) { font-size:0.75rem; padding:5px 4px; }
       .btn { font-size:0.9rem; padding:6px 8px; }
     }
+
+    /* ---------- table: compact, no weird wrapping on mobile ---------- */
+/* Base: compact table */
+#resultArea table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: inherit;
+  /* keep automatic layout on desktop for best sizing */
+  table-layout: auto;
+}
+
+/* normal padding on desktop */
+#resultArea table th,
+#resultArea table td {
+  padding: 8px 10px;
+  text-align: center;
+  vertical-align: middle;
+  word-break: normal; /* avoid breaking numbers mid-word */
+}
+
+/* subject left-aligned */
+#resultArea table th:first-child,
+#resultArea table td:first-child {
+  text-align: left;
+  padding-left: 10px;
+  word-break: break-word;
+}
+
+/* ===== mobile: force fixed layout, shrink numeric columns ===== */
+@media (max-width: 520px) {
+  /* Use fixed layout so column widths do not expand unexpectedly */
+  #resultArea table {
+    table-layout: fixed;
+    font-size: 0.82rem;
+  }
+
+  /* Make numeric columns very narrow and prevent wrapping there */
+  #resultArea table th,
+  #resultArea table td {
+    padding: 6px 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap; /* prevent numeric cells from wrapping */
+  }
+
+  /* Allow subject column to wrap (so long subject names flow to next line inside that cell only) */
+  #resultArea table th:first-child,
+  #resultArea table td:first-child {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-weight: 600;
+    /* give subject column the largest share */
+    width: 55%;
+  }
+
+  /* Give numeric columns a small fixed width so the row stays on one line */
+  /* These rules apply to 2nd..nth columns (exam, monthly, final, total, max, etc.) */
+  #resultArea table th:not(:first-child),
+  #resultArea table td:not(:first-child) {
+    width: 6ch;        /* small but enough for values like "100" or "40" */
+    text-align: center;
+  }
+
+  /* Very small screens: make numbers even tighter */
+  @media (max-width: 360px) {
+    #resultArea table th:not(:first-child),
+    #resultArea table td:not(:first-child) {
+      width: 5ch;
+      padding: 5px 4px;
+      font-size: 0.78rem;
+    }
+    #resultArea table th:first-child,
+    #resultArea table td:first-child {
+      width: 60%;
+      font-size: 0.88rem;
+    }
+  }
+}
+
   </style>
 </head>
 <body>
@@ -149,3 +229,4 @@
   <script type="module" src="main.js"></script>
 </body>
 </html>
+
