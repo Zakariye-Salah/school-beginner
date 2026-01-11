@@ -1,4 +1,4 @@
-// main.js
+// main.js (updated headerHtml block uses header-right & exam-line classes)
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -34,18 +34,16 @@ function gradeColor(g){
   if(g.startsWith('B')) return '#3b82f6'; if(g.startsWith('C')) return '#f59e0b'; return '#b91c1c';
 }
 
-/* ---------- Make the input toggle work immediately (before search) ---------- */
+/* input toggle before search */
 (function wireInputToggleNow(){
   if(!toggleIdInputBtn || !studentIdInput) return;
   let hidden = false;
   toggleIdInputBtn.addEventListener('click', () => {
     hidden = !hidden;
     studentIdInput.type = hidden ? 'password' : 'text';
-    // swap icon (simple swap of path — replace innerHTML)
     if(hidden){
       toggleIdInputBtn.innerHTML = `
         <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- eye closed -->
           <path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/>
         </svg>`;
@@ -58,7 +56,7 @@ function gradeColor(g){
   });
 })();
 
-/* ---------- renderResult ---------- */
+/* renderResult with header-right / exam-line classes (keeps rest identical) */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -66,7 +64,6 @@ async function renderResult(doc, opts = {}) {
   const published = doc.publishedAt ? new Date(doc.publishedAt.seconds ? doc.publishedAt.seconds * 1000 : doc.publishedAt).toLocaleString() : '';
   const examName = doc.examName || doc.examId || '';
 
-  // detect components
   let compsEnabled = doc.components || null;
   if(!compsEnabled){
     compsEnabled = { assignment:false, quiz:false, monthly:false, exam:false };
@@ -79,7 +76,6 @@ async function renderResult(doc, opts = {}) {
     }
   }
 
-  // Build table HTML
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
   let tableHtml = `<div class="card"><div style="overflow:auto"><table><thead><tr><th>Subject</th>`;
   if(hasLinked) tableHtml += `<th>${escapeHtml(doc.linkedExamName || 'Prev')}</th>`;
@@ -120,7 +116,6 @@ async function renderResult(doc, opts = {}) {
   }
   tableHtml += `</tbody></table></div></div>`;
 
-  // totals
   const total = typeof doc.total !== 'undefined' ? Number(doc.total) : totGot;
   const averageRaw = typeof doc.average !== 'undefined' ? Number(doc.average) : ((doc.subjects && doc.subjects.length) ? (total / doc.subjects.length) : 0);
   const sumMax = totMax;
@@ -130,7 +125,6 @@ async function renderResult(doc, opts = {}) {
   const percentCol = percentColor(percent);
   const gradeBg = gradeColor(grade);
 
-  // header layout: school name, student name + ID (masked toggle), then class & exam on one row (exam wraps if long), mother, published+source on single row
   const schoolName = 'Al-Fatxi Primary & Secondary School';
   const studentName = escapeHtml(doc.studentName || 'Magac aan la garanayn');
   const studentIdRaw = escapeHtml(doc.studentId || '');
@@ -138,7 +132,7 @@ async function renderResult(doc, opts = {}) {
   const examLabel = escapeHtml(examName || '');
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
-  // Build header HTML (class + exam on one row; exam can wrap)
+  // headerHtml uses .header-right and .exam-line so CSS controls wrapping
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
@@ -156,22 +150,19 @@ async function renderResult(doc, opts = {}) {
             </div>
           </div>
 
-          <!-- CLASS + EXAM: one line; exam will wrap if long -->
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:nowrap;max-width:45%;text-align:right;justify-content:flex-end">
-            <div style="white-space:nowrap">Class: <strong style="font-weight:900">${className}</strong></div>
-            <div style="max-width:220px;word-wrap:break-word;text-align:right">Exam: <strong style="font-weight:900">${examLabel}</strong></div>
+          <div class="header-right">
+            <div class="class-line">Class: <strong style="font-weight:900">${className}</strong></div>
+            <div class="exam-line">Exam: <strong>${examLabel}</strong></div>
           </div>
         </div>
 
         <div style="margin-top:6px">
           ${mother ? `<div><strong>Ina Hooyo:</strong> ${mother}</div>` : ''}
-          <!-- published + source on single row -->
           <div style="margin-top:4px;color:var(--muted)">${escapeHtml('Published:')} ${escapeHtml(published)} &nbsp;&nbsp; Source: AL-Fatxi School</div>
         </div>
       </div>
     </div>`;
 
-  // totals block & actions
   const totalsHtml = `
     <div class="totals-card card">
       <div class="totals-block">
@@ -195,10 +186,9 @@ async function renderResult(doc, opts = {}) {
     </div>`;
 
   resultArea.innerHTML = headerHtml + tableHtml + totalsHtml;
-
   hideLoader();
 
-  /* ---------- mask ID toggle (display) ---------- */
+  /* mask ID (display) */
   const maskBtn = document.getElementById('maskIdBtn');
   const studentIdText = document.getElementById('studentIdText');
   const eyeOpen = document.getElementById('eyeOpen');
@@ -218,7 +208,7 @@ async function renderResult(doc, opts = {}) {
   }
   if(maskBtn){ maskBtn.addEventListener('click', ()=>{ masked = !masked; applyMask(); }); applyMask(); }
 
-  /* ---------- screenshot (hide action buttons while capturing) ---------- */
+  /* screenshot */
   const screenshotBtn = document.getElementById('screenshotBtn');
   const actionsGroup = document.getElementById('actionsGroup');
   if(screenshotBtn){
@@ -240,7 +230,7 @@ async function renderResult(doc, opts = {}) {
     };
   }
 
-  /* ---------- PDF generation (bigger fonts, smaller paddings) ---------- */
+  /* PDF generation (unchanged, kept larger fonts as before) */
   const printBtn = document.getElementById('printBtn');
   if(printBtn){
     printBtn.onclick = async () => {
@@ -249,14 +239,12 @@ async function renderResult(doc, opts = {}) {
         const { jsPDF } = window.jspdf;
         const docPdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
         const margin = 20; let y = margin;
-        // larger overall fonts (you requested ~15px look)
         docPdf.setFontSize(18); docPdf.text(schoolName, margin, y); y += 24;
         docPdf.setFontSize(15); docPdf.text(`${doc.studentName || ''}    ID: ${doc.studentId || ''}`, margin, y); y += 20;
         if(mother) { docPdf.setFontSize(13); docPdf.text(`Ina Hooyo: ${mother}`, margin, y); y += 18; }
         docPdf.setFontSize(13); docPdf.text(`Class: ${className}    Exam: ${examLabel}`, margin, y); y += 20;
         docPdf.setFontSize(12); docPdf.text(`Published: ${published}    Source: AL-Fatxi School`, margin, y); y += 20;
 
-        // build columns
         const cols = [];
         cols.push({ header: 'Subject', dataKey: 'subject' });
         if(hasLinked) cols.push({ header: (doc.linkedExamName || 'Prev'), dataKey: 'linked' });
@@ -283,7 +271,7 @@ async function renderResult(doc, opts = {}) {
           startY: y,
           head: [cols.map(c=>c.header)],
           body: tableData.map(r => cols.map(c => r[c.dataKey] || '')),
-          styles: { fontSize: 12, cellPadding: 6 }, // slightly larger font, small padding
+          styles: { fontSize: 12, cellPadding: 6 },
           headStyles: { fillColor: [240,240,240], textColor: [20,20,20], fontStyle: 'bold' },
           margin: { left: margin, right: margin }
         });
@@ -304,11 +292,9 @@ async function renderResult(doc, opts = {}) {
     };
   }
 
-  // wire More published button
   const moreBtn = document.getElementById('moreExamsBtn');
   if(moreBtn) moreBtn.onclick = () => togglePublishedList(doc.studentId);
 
-  // update ranks asynchronously
   if(doc.examId){
     (async ()=>{
       try{
@@ -421,3 +407,4 @@ searchBtn.onclick = async () => {
     console.error(err); message.textContent = 'Khalad ayaa dhacay. Fadlan isku day mar kale.'; hideLoader();
   }
 };
+export { renderResult }; // optional
