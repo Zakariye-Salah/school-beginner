@@ -26,46 +26,36 @@
     .input-row { display:flex; gap:8px; align-items:center }
     input#studentId { flex:1; padding:10px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box }
 
-    /* Result header */
+    /* Header: stacked lines for mobile as requested */
     .result-school { font-weight:900; font-size:1rem; margin-bottom:6px }
     .result-header { display:flex; flex-direction:column; gap:6px; }
-    .header-top { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:nowrap }
-    .student-line { display:flex; gap:12px; align-items:center; flex-wrap:wrap }
-    .student-name { font-size:1.18rem; font-weight:900; font-style:italic; transform:skewX(-2deg) }
+    .student-line { display:block }
+    .student-name { font-size:1.18rem; font-weight:900; font-style:italic; transform:skewX(-2deg); display:inline-block; padding:6px 12px; border-radius:10px; background:linear-gradient(90deg, rgba(11,116,255,0.06), rgba(11,116,255,0.02)); color:var(--text) }
 
-    .meta-inline { color:var(--muted); display:flex; gap:10px; align-items:center; font-weight:700; font-size:0.95rem }
-    .meta-inline .label { color:var(--muted); font-weight:700 }
-
-    /* new header-right: keep class+exam on the same row, allow exam to wrap inside its box */
-    .header-right { display:flex; gap:12px; align-items:center; justify-content:flex-end; white-space:nowrap; }
-    .header-right .class-line { white-space:nowrap; font-weight:700; }
-    .header-right .exam-line { max-width:260px; text-align:right; word-wrap:break-word; overflow-wrap:break-word; white-space:normal; }
+    .id-class-line, .exam-line, .mother-line, .published-line, .source-line { font-weight:700; color:var(--muted); font-size:0.95rem }
+    .id-class-line strong, .exam-line strong { color:var(--text); font-weight:900 }
 
     /* Table */
     #resultArea table { width:100%; border-collapse:collapse; font-family:inherit; }
     #resultArea thead tr { background:#f8fafc }
-    /* subject header slightly bigger than others; other headers small (12px) */
-    /* reduced padding to make headers tighter */
-    #resultArea th { font-weight:800; text-align:center; white-space:normal; font-size:12px; padding:6px 8px; }
-    #resultArea th:first-child { font-size:13px; text-align:left; padding-left:8px; }
-    #resultArea td { font-weight:700; text-align:center; font-size:13px; padding:6px 8px; }
-    #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; padding-left:8px; }
+    #resultArea th { font-weight:800; text-align:center; white-space:normal; font-size:12px; padding:8px 10px; border-bottom:1px solid #f1f5f9 }
+    #resultArea th:first-child { font-size:13px; text-align:left; padding-left:12px; }
+    #resultArea td { font-weight:700; text-align:center; font-size:13px; padding:8px 10px; border-bottom:1px solid #fbfdff }
+    #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; padding-left:12px; }
 
-    /* numeric columns compact and no-wrap */
-    /* shrink numeric columns (less space) */
-    #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; width:5ch; padding:6px 6px; }
+    /* small sub-label used for two-line mobile headers (hidden on desktop) */
+    .small { display:none; font-size:11px; color:var(--muted); line-height:1.05 }
 
-    /* allow header text (th) that has two words to wrap into two lines (no ellipsis) */
-    #resultArea th:not(:first-child) { white-space:normal; word-break:break-word; overflow-wrap:break-word; }
+    /* numeric columns compact but allow wrap */
+    #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; min-width:36px; padding:6px 8px; }
 
-    /* Totals layout (4 lines) */
+    /* Totals layout - show all items inline (no left/right float) */
     .totals-card { margin-top:12px; padding:12px; border-radius:10px; }
-    .totals-block { display:flex; flex-direction:column; gap:6px; font-weight:800; }
-    .tot-line { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+    .totals-block { display:flex; flex-direction:column; gap:8px; font-weight:800; }
+    .tot-line { display:flex; gap:18px; align-items:center; flex-wrap:wrap; justify-content:flex-start; }
 
     .grade-badge { padding:6px 10px; border-radius:8px; color:#fff; font-weight:900; display:inline-block }
 
-    /* actions group */
     .actions-group { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap }
 
     /* loader */
@@ -78,24 +68,26 @@
 
     /* responsive tweaks */
     @media (max-width:760px){
-      .header-right { max-width: 48%; } /* leave space so header doesn't overflow */
-    }
-    @media (max-width:540px){
-      :root{--tiny-size:9px;--btn-font:14px}
+      .container{padding:10px}
       .student-name{font-size:1.02rem}
       #resultArea th{font-size:11px}
       #resultArea td{font-size:12px}
       .grade-badge{font-size:0.9rem;padding:5px 8px}
       .btn{font-size:14px;padding:8px 10px;border-radius:9px}
-      #resultArea td:not(:first-child){width:4ch}
-      .header-right { max-width: 60%; }
-      .header-right .exam-line { max-width: 160px; } /* allow exam to wrap but not overflow */
+      #resultArea td:not(:first-child){min-width:40px}
+      /* show small sublabels on mobile so headers become two-line */
+      .small { display:block; }
     }
 
-    /* very small */
-    @media (max-width:360px){
+    @media (min-width:761px){
+      /* desktop: keep one-line header appearance */
+      .small { display:none; }
+    }
+
+    @media (max-width:420px){
       #resultArea th{font-size:10px}
       #resultArea td{font-size:11px}
+      .id-class-line, .exam-line, .published-line { font-size:0.95rem }
     }
   </style>
 </head>
@@ -109,7 +101,6 @@
       <div class="input-row" style="margin-top:6px">
         <input id="studentId" placeholder="STD042687284" />
         <button id="toggleIdInputBtn" class="btn" title="Toggle ID input visibility" aria-label="Toggle ID input">
-          <!-- initial icon: eye open -->
           <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/>
           </svg>
