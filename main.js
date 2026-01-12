@@ -270,13 +270,18 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
     }
   }
 
-  // Short subtitle (kept brief — no duplication)
   if(modalMsgEl){
-    // include the student's name in the short subtitle for both fail and success
-    modalMsgEl.textContent = isFail
-      ? `${studentName || 'Arday'} — Ha quusan — nala soo xiriir si aan kuu caawinno haddii aad qabto dood.`
-      : `${studentName || 'Arday'} — Soo Dhawoow Arday — waan kuu hambalyeynaynaa!`;
+    // include student name + exam name and make subtitle blue
+    const examPart = examLabel ? ` — Imtixaanka: ${examLabel}` : '';
+    if(isFail){
+      modalMsgEl.textContent = `${studentName || 'Arday'} — Ha quusan — nala soo xiriir si aan kuu caawinno haddii aad qabto dood.${examPart}`;
+    } else {
+      modalMsgEl.textContent = `${studentName || 'Arday'} — Soo Dhawoow Arday — waan kuu hambalyeynaynaa!${examPart}`;
+    }
+    // set subtitle color to blue
+    modalMsgEl.style.color = '#2563eb';
   }
+  
   
 
   // Fill structured fields (these present the full details — so we don't repeat a long sentence)
@@ -758,4 +763,3 @@ searchBtn.onclick = async () => {
   }
 };
 export { renderResult };
- 
