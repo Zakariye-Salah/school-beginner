@@ -69,7 +69,7 @@
     }
     .celebration-overlay.active{display:flex}
     .celebration-backdrop{
-      position:absolute; inset:0; background:rgba(2,6,23,0.45); backdrop-filter:blur(2px);
+      position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,6,23,0.45), rgba(2,6,23,0.28)); backdrop-filter:blur(3px);
     }
     .celebration-fall {
       position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1295;
@@ -79,23 +79,34 @@
       animation-name: fallSpin; animation-iteration-count: 1; animation-timing-function: linear;
       opacity:0.95;
       text-shadow:0 6px 18px rgba(0,0,0,0.08);
+      transform-origin:center center;
     }
     @keyframes fallSpin { to { transform: translate3d(var(--tx,0), 120vh, 0) rotate(var(--rot,0)); opacity: 0.95; } }
 
     .celebration-modal{
       position:relative; z-index:1310; width:min(640px, 94%); max-width:720px;
-      background:linear-gradient(180deg,#ffffff,#fbfdff); border-radius:14px; padding:18px; box-shadow:0 30px 80px rgba(2,6,23,0.38);
-      text-align:center; font-weight:800;
+      background:linear-gradient(180deg,#ffffff,#f7fbff); border-radius:14px; padding:18px; box-shadow:0 30px 80px rgba(2,6,23,0.22);
+      text-align:center; font-weight:800; transform-origin:top center; opacity:0;
     }
-    .modal-logo{ width:64px;height:64px; object-fit:contain; border-radius:8px; display:block; margin:0 auto 8px auto; }
-    .modal-badge{ width:88px; height:88px; border-radius:999px; display:inline-grid; place-items:center; font-size:28px; font-weight:900; color:#fff; margin:6px auto 12px auto; box-shadow:0 8px 22px rgba(2,6,23,0.16) }
-    .modal-title{ font-size:1.18rem; margin:6px 0 4px 0 }
-    .modal-msg{ font-size:0.98rem; color:var(--muted); font-weight:700; margin:6px 0 12px 0; line-height:1.35 }
-    .modal-school{ font-size:0.9rem; color:#0f172a; margin-top:6px; font-weight:800 }
-    .modal-close{ position:absolute; right:12px; top:12px; background:transparent;border:0;font-size:18px;font-weight:900;color:var(--muted); cursor:pointer }
-    .celebration-actions{ margin-top:8px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap }
+    .celebration-modal.pop { animation: modalPop .36s cubic-bezier(.2,.9,.3,1) forwards; }
+    @keyframes modalPop { from { transform: translateY(-8px) scale(.98); opacity:0 } to { transform: translateY(0) scale(1); opacity:1 } }
 
-    /* responsive tweaks */
+    .modal-logo{ width:64px;height:64px; object-fit:contain; border-radius:8px; display:block; margin:0 auto 8px auto; }
+    .modal-badge{ width:88px; height:88px; border-radius:999px; display:inline-grid; place-items:center; font-size:28px; font-weight:900; color:#0f172a; margin:6px auto 12px auto; box-shadow:0 12px 40px rgba(59,130,246,0.15); background:linear-gradient(135deg,#fff176,#ffd54f); border:6px solid rgba(255,255,255,0.85); }
+    .modal-badge.glow{ box-shadow:0 18px 48px rgba(59,130,246,0.18), 0 6px 20px rgba(0,0,0,0.06); }
+    .modal-title{ font-size:1.28rem; margin:6px 0 6px 0; letter-spacing:0.2px }
+    .modal-sub{ font-size:0.95rem; color:var(--muted); margin-bottom:8px }
+    .modal-msg{ font-size:0.98rem; color:var(--muted); font-weight:700; margin:6px 0 6px 0; line-height:1.35 }
+    .modal-school{ font-size:0.9rem; color:#0f172a; margin-top:10px; font-weight:800 }
+    .modal-close{ position:absolute; right:12px; top:12px; background:transparent;border:0;font-size:18px;font-weight:900;color:var(--muted); cursor:pointer }
+    .celebration-actions{ margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap }
+
+    /* modal structured info styling */
+    .modal-info { margin-top:8px; font-weight:900; display:flex; flex-direction:column; gap:8px; align-items:center }
+    .modal-info .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .modal-info .label { color:var(--muted); font-weight:800; margin-right:6px }
+
+    /* small responsive tweaks */
     @media (max-width:760px){
       .container{padding:10px}
       .student-name{font-size:1.02rem}
@@ -117,6 +128,23 @@
       #resultArea td{font-size:11px}
       .id-class-line, .exam-line, .published-line { font-size:0.95rem }
     }
+
+    /* ===== Highlighted result labels (user requested) ===== */
+    .label-strong { font-weight: 900; }
+    .rank-text { font-size: 1.15rem; font-weight: 900; text-transform: capitalize }
+
+    .total-blue { color: #2563eb; font-weight: 900; }
+    .total-green { color: #10b981; font-weight: 900; }
+    .total-red { color: #dc2626; font-weight: 900; }
+
+    .avg-green { color: #16a34a; font-weight: 900; }
+    .avg-red { color: #dc2626; font-weight: 900; }
+
+    .grade-badge { font-weight: 900; padding: 6px 10px; border-radius: 8px; color: #fff; }
+
+    .status-pass { background: #16a34a; color: #fff; font-weight: 900; padding: 6px 10px; border-radius: 8px; }
+    .status-fail { background: #dc2626; color: #fff; font-weight: 900; padding: 6px 10px; border-radius: 8px; }
+
   </style>
 </head>
 <body>
@@ -136,6 +164,7 @@
       </div>
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
         <button id="searchBtn" class="btn btn-primary">Raadi</button>
+        <button id="audioToggleBtn" class="btn" title="Toggle audio (default OFF)">🔈 Audio: OFF</button>
         <div id="message" style="color:#c00;font-weight:700"></div>
       </div>
     </div>
@@ -154,7 +183,17 @@
       <img src="assets/logo.png" alt="AL-FATXI logo" class="modal-logo" onerror="this.style.display='none'"/>
       <div id="modalBadge" class="modal-badge">1</div>
       <div id="modalTitle" class="modal-title">Waxaad gashay kaalinta 1aad!</div>
-      <div id="modalMsg" class="modal-msg">Halkan fariinta modal-ka — waxa kuu diyaarsan.</div>
+      <div id="modalMsg" class="modal-sub">AL-FATXI — Ugu imow waxbarasho tayo leh</div>
+
+      <!-- New structured info lines (student name, totals, average, grade, status) -->
+      <div class="modal-info" aria-live="polite">
+        <div class="row"><span class="label-strong">Magaca:</span> <span id="modalStudentName" class="rank-text">Sufyaan Geedi</span></div>
+        <div class="row"><span class="label-strong">Total:</span> <span id="modalTotalGot" class="total-blue">537</span> <span>/</span> <span id="modalTotalMax" class="total-green">600</span></div>
+        <div class="row"><span class="label-strong">Average:</span> <span id="modalAverage" class="avg-green">89.50%</span></div>
+        <div class="row"><span class="label-strong">Grade:</span> <span id="modalGrade" class="grade-badge" style="background:#3b82f6">A</span></div>
+        <div class="row"><span class="label-strong">Status:</span> <span id="modalStatus" class="status-pass">Gudbay</span></div>
+      </div>
+
       <div class="modal-school">AL-FATXI PRIMARY AND SECONDARY SCHOOL — Ugu imow waxbarasho tayo leh</div>
       <div class="celebration-actions">
         <button id="celebrationCloseBtn" class="btn btn-ghost">Xir</button>
@@ -167,6 +206,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
+  <!-- main.js is kept external. IMPORTANT: replace only the showCelebration function in your main.js with the updated function provided separately. -->
   <script type="module" src="main.js"></script>
 </body>
 </html>
