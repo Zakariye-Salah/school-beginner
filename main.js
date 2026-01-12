@@ -24,6 +24,15 @@ const celebrationClose = document.getElementById('celebrationClose');
 const celebrationCloseBtn = document.getElementById('celebrationCloseBtn');
 const celebrationFall = document.getElementById('celebrationFall');
 
+const toggleEmojisBtn = document.getElementById('toggleEmojisBtn'); // new: show/hide emoji button
+const toggleEmojisIcon = document.getElementById('toggleEmojisIcon');
+const clapAudioEl = document.getElementById('clapAudio'); // preloaded audio element
+
+// state for emoji visibility
+let emojisVisible = true;
+let lastEmojiType = 'celebrate';
+
+
 let loaderInterval = null;
 const loaderMessages = ['Fadlan sug...','Waxaan hubineynaa xogta...','Waxaa la soo rarayaa natiijooyinka...'];
 function showLoader(){ if(!loaderOverlay) return; loaderOverlay.style.display='flex'; let i=0; loaderMessageEl.textContent = loaderMessages[0]; if(loaderInterval) clearInterval(loaderInterval); loaderInterval = setInterval(()=>{ i=(i+1)%loaderMessages.length; loaderMessageEl.textContent = loaderMessages[i]; },2200); }
@@ -152,17 +161,36 @@ async function tryPlayCandidates(candidates){
 
 async function playAudioFileIfEnabled(path, fallbackFn){
   if(!audioEnabled) return; // respect audio on/off default OFF
-  if(!path) { fallbackFn && fallbackFn(); return; }
-  const cleaned = String(path).replace(/^\.\//, '').replace(/^\/+/, '');
-  const candidates = [cleaned, '/' + cleaned, './' + cleaned];
-  try{
-    const ok = await tryPlayCandidates(candidates);
-    if(!ok) fallbackFn && fallbackFn();
-  }catch(e){
-    console.warn('Audio playback error', e);
-    fallbackFn && fallbackFn();
+
+  // Try the preloaded audio element first (simplest & most reliable)
+  if(clapAudioEl && clapAudioEl.src){
+    try{
+      // reset to start
+      clapAudioEl.currentTime = 0;
+      await clapAudioEl.play();
+      return;
+    }catch(err){
+      // If play() failed (browser blocked or file not available) — ignore and fall back
+      console.warn('clapAudio play failed:', err);
+    }
   }
+
+  // If a path was passed, try it via Audio objects (keeps your candidate path logic)
+  if(path){
+    const cleaned = String(path).replace(/^\.\//, '').replace(/^\/+/, '');
+    const candidates = [cleaned, '/' + cleaned, './' + cleaned];
+    try{
+      const ok = await tryPlayCandidates(candidates);
+      if(ok) return;
+    }catch(e){
+      console.warn('tryPlayCandidates error', e);
+    }
+  }
+
+  // final fallback: synthesized clap
+  fallbackFn && fallbackFn();
 }
+
 
 /* ---------- continuous falling emoji (stars/hearts/moon) + sad emojis ----------
    - continuous: a repeating burst runs until stopEmojiRain() is called (modal close)
@@ -214,6 +242,26 @@ function stopEmojiRain(){
   }
   if(celebrationFall) celebrationFall.innerHTML = '';
 }
+
+// toggle emoji rain when the user clicks the modal toggle button
+if(toggleEmojisBtn){
+  toggleEmojisBtn.addEventListener('click', (e) => {
+    emojisVisible = !emojisVisible;
+    toggleEmojisBtn.setAttribute('aria-pressed', String(emojisVisible));
+    if(emojisVisible){
+      // restart rain with the last used type (sad/celebrate)
+      startEmojiRain(lastEmojiType || 'celebrate');
+      if(toggleEmojisIcon) toggleEmojisIcon.textContent = '🎊';
+    } else {
+      stopEmojiRain();
+      if(toggleEmojisIcon) toggleEmojisIcon.textContent = '🚫';
+    }
+  });
+}
+
+// ensure lastEmojiType is updated when starting rain in showCelebration
+// (we'll set that below inside showCelebration)
+
 
 /* ---------- showCelebration ----------
    - uses startEmojiRain() so falling continues until the modal is closed
@@ -328,7 +376,10 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
   celebrationOverlay.setAttribute('aria-hidden','false');
 
   // emoji rain
-  startEmojiRain(isFail ? 'sad' : 'celebrate');
+ // emoji rain
+lastEmojiType = isFail ? 'sad' : 'celebrate';
+if(emojisVisible) startEmojiRain(lastEmojiType);
+
 
   // play audio for certain ranks if enabled
   if(!isFail && Number(rankNum) === 10){
