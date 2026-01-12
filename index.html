@@ -26,7 +26,6 @@
     .input-row { display:flex; gap:8px; align-items:center }
     input#studentId { flex:1; padding:10px; border-radius:8px; border:1px solid #e6eefc; font-size:1rem; box-sizing:border-box }
 
-    /* Header: stacked lines for mobile as requested */
     .result-school { font-weight:900; font-size:1rem; margin-bottom:6px }
     .result-header { display:flex; flex-direction:column; gap:6px; }
     .student-line { display:block }
@@ -43,13 +42,10 @@
     #resultArea td { font-weight:700; text-align:center; font-size:13px; padding:8px 10px; border-bottom:1px solid #fbfdff }
     #resultArea td:first-child { text-align:left; font-weight:800; font-size:13px; padding-left:12px; }
 
-    /* small sub-label used for two-line mobile headers (hidden on desktop) */
     .small { display:none; font-size:11px; color:var(--muted); line-height:1.05 }
 
-    /* numeric columns compact but allow wrap */
     #resultArea td:not(:first-child), #resultArea th:not(:first-child) { white-space:nowrap; min-width:36px; padding:6px 8px; }
 
-    /* Totals layout - show all items inline (no left/right float) */
     .totals-card { margin-top:12px; padding:12px; border-radius:10px; }
     .totals-block { display:flex; flex-direction:column; gap:8px; font-weight:800; }
     .tot-line { display:flex; gap:18px; align-items:center; flex-wrap:wrap; justify-content:flex-start; }
@@ -66,27 +62,32 @@
     .dots .d:nth-child(2){animation-delay:.12s}.dots .d:nth-child(3){animation-delay:.24s}
     @keyframes jump{0%{transform:translateY(0)}25%{transform:translateY(-6px)}50%{transform:translateY(0)}}
 
-    /* Celebration modal + blurred dots */
+    /* Celebration overlay + falling dots/confetti */
     .celebration-overlay{
-      position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:1300;
+      position:fixed; inset:0; display:none; align-items:flex-start; justify-content:center; z-index:1300;
+      padding-top:5vh; /* keep modal near top */
     }
     .celebration-overlay.active{display:flex}
     .celebration-backdrop{
       position:absolute; inset:0; background:rgba(2,6,23,0.45); backdrop-filter:blur(2px);
     }
-    /* many blurred dots layer */
-    .celebration-dots{
-      position:absolute; inset:0; pointer-events:none;
-      background-image:
-        radial-gradient(circle at 10% 20%, rgba(11,116,255,0.12) 0 4px, transparent 5px),
-        radial-gradient(circle at 30% 40%, rgba(3,201,169,0.08) 0 3px, transparent 4px),
-        radial-gradient(circle at 75% 20%, rgba(255,193,7,0.06) 0 6px, transparent 7px),
-        radial-gradient(circle at 50% 70%, rgba(234,84,85,0.06) 0 5px, transparent 6px),
-        radial-gradient(circle at 85% 80%, rgba(139,92,246,0.05) 0 4px, transparent 5px);
-      filter: blur(18px); opacity:0.55;
+    .celebration-fall {
+      position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1295;
     }
+    .fall-dot {
+      position:absolute; top:-6%; width:10px; height:10px; border-radius:50%; opacity:0.95;
+      filter: blur(0.8px); transform:translate3d(0,0,0);
+      will-change: transform, opacity;
+      animation-name: fallSpin;
+      animation-iteration-count: 1;
+      animation-timing-function: linear;
+    }
+    @keyframes fallSpin {
+      to { transform: translate3d(var(--tx,0), 120vh, 0) rotate(var(--rot,0)); opacity: 0.9; }
+    }
+
     .celebration-modal{
-      position:relative; z-index:1310; width:min(540px, 92%); max-width:720px;
+      position:relative; z-index:1310; width:min(640px, 94%); max-width:720px;
       background:linear-gradient(180deg,#ffffff,#fbfdff); border-radius:14px; padding:18px; box-shadow:0 30px 80px rgba(2,6,23,0.38);
       text-align:center; font-weight:800;
     }
@@ -146,17 +147,17 @@
 
   <div id="loaderOverlay"><div class="loader-card"><div class="dots"><span class="d"></span><span class="d"></span><span class="d"></span></div><div id="loaderMessage" style="color:var(--muted)">Fadlan sug...</div></div></div>
 
-  <!-- celebration modal overlay (added but hidden by default) -->
+  <!-- celebration overlay -->
   <div id="celebrationOverlay" class="celebration-overlay" aria-hidden="true">
     <div class="celebration-backdrop"></div>
-    <div class="celebration-dots"></div>
+    <div id="celebrationFall" class="celebration-fall" aria-hidden="true"></div>
     <div id="celebrationModal" class="celebration-modal" role="dialog" aria-modal="true" style="display:none">
       <button id="celebrationClose" class="modal-close" aria-label="Close">✕</button>
       <div id="modalBadge" class="modal-badge">1</div>
       <div id="modalTitle" class="modal-title">Waxaad gashay kaalinta 1aad!</div>
-      <div id="modalMsg" class="modal-msg">Sufyaan Geedi waxaad gashay kaalinta 1aad ee fasalkiina — waxayna ahayd total: 1000/1200 average: 89% — waxaan kuu rajeyneenaa guul.</div>
+      <div id="modalMsg" class="modal-msg">Sufyaan Geedi waxaad gashay kaalinta 1aad ee fasalkiina — total: 1000/1200 average: 89% — waxaan kuu rajeyneenaa guul.</div>
       <div class="celebration-actions">
-        <button id="celebrationCloseBtn" class="btn btn-ghost">Close</button>
+        <button id="celebrationCloseBtn" class="btn btn-ghost">Xir</button>
       </div>
     </div>
   </div>
@@ -169,3 +170,4 @@
   <script type="module" src="main.js"></script>
 </body>
 </html>
+ 
