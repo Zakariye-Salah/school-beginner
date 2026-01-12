@@ -315,6 +315,8 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
   const modalTitleEl = document.getElementById('modalTitle');
   const modalMsgEl = document.getElementById('modalMsg');
   const modalStudentName = document.getElementById('modalStudentName');
+  const modalClassName = document.getElementById('modalClassName');
+
   const modalTotalGot = document.getElementById('modalTotalGot');
   const modalTotalMax = document.getElementById('modalTotalMax');
   const modalAverage = document.getElementById('modalAverage');
@@ -338,6 +340,8 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
   }
 
   if(modalStudentName) modalStudentName.textContent = studentName || '';
+  if(modalClassName) modalClassName.textContent = className || '';
+
   if(modalTotalGot) { modalTotalGot.textContent = totalGot || ''; modalTotalGot.className = 'total-blue'; }
   if(modalTotalMax) { modalTotalMax.textContent = totalMax || ''; modalTotalMax.className = 'total-green'; }
   if(modalAverage) { modalAverage.textContent = avgRaw; modalAverage.className = (typeof percent === 'number' && percent < 50) ? 'avg-red' : 'avg-green'; }
