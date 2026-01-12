@@ -586,6 +586,7 @@ function gatherExportRows(){
 }
 
 /* CSV generation */
+/* CSV generation */
 async function downloadCSV(rows, includeHeader=true){
   const subjectDefs = computeHeaderSubjectsForExport() || [];
   const subjectNames = subjectDefs.map(s=> s.name );
@@ -595,6 +596,8 @@ async function downloadCSV(rows, includeHeader=true){
   // header columns
   const header = ['Rank','ID','Name','Class', ...subjectNames];
   if(exam.components?.monthly) header.push('Monthly');
+  if(exam.components?.cw1) header.push('CW1');
+  if(exam.components?.cw2) header.push('CW2');
   if(linkedLabel) header.push(linkedLabel);
   if(exam.components?.exam) header.push(examHeaderLabel);
   header.push('Total','Avg (%)');
@@ -616,6 +619,8 @@ async function downloadCSV(rows, includeHeader=true){
     });
 
     const monthly = (r.compTotals && r.compTotals.monthly) ? r.compTotals.monthly : 0;
+    const cw1tot  = (r.compTotals && r.compTotals.cw1) ? r.compTotals.cw1 : 0;
+    const cw2tot  = (r.compTotals && r.compTotals.cw2) ? r.compTotals.cw2 : 0;
     const examComp = (r.compTotals && r.compTotals.exam) ? r.compTotals.exam : 0;
 
     // percent calculation: use subject max values from r.subjects
@@ -631,8 +636,10 @@ async function downloadCSV(rows, includeHeader=true){
       ...subjectMarks
     ];
     if(exam.components?.monthly) cols.push(monthly);
-    if(linkedLabel) cols.push(r.linkedTotal || 0);
-    if(exam.components?.exam) cols.push(examComp);
+    if(exam.components?.cw1)     cols.push(cw1tot);
+    if(exam.components?.cw2)     cols.push(cw2tot);
+    if(linkedLabel)             cols.push(r.linkedTotal || 0);
+    if(exam.components?.exam)   cols.push(examComp);
     cols.push(r.total, percentStr);
 
     lines.push(cols.map(escapeCsv).join(','));
@@ -648,6 +655,7 @@ async function downloadCSV(rows, includeHeader=true){
   const fname = `${(exam.name||'exam').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
   triggerDownload(blob, fname);
 }
+
 
 
 
@@ -688,8 +696,10 @@ async function downloadPDF(rows, includeHeader=true){
     ...subjectCols
   ];
   if(exam.components?.monthly) cols.push({ header: 'Monthly', dataKey: 'monthly' });
-  if(linkedLabel) cols.push({ header: linkedLabel, dataKey: 'linked' });
-  if(exam.components?.exam) cols.push({ header: examHeaderLabel, dataKey: 'exam' });
+  if(exam.components?.cw1)     cols.push({ header: 'CW1', dataKey: 'cw1' });
+  if(exam.components?.cw2)     cols.push({ header: 'CW2', dataKey: 'cw2' });
+  if(linkedLabel)              cols.push({ header: linkedLabel, dataKey: 'linked' });
+  if(exam.components?.exam)   cols.push({ header: examHeaderLabel, dataKey: 'exam' });
   cols.push({ header: 'Total', dataKey: 'total' }, { header: 'Avg (%)', dataKey: 'percent' });
 
   const data = rows.map(r=>{
@@ -704,8 +714,10 @@ async function downloadPDF(rows, includeHeader=true){
       obj[sd.name] = found ? String(found.mark) : '0';
     }
     if(exam.components?.monthly) obj['monthly'] = r.compTotals.monthly || 0;
-    if(linkedLabel) obj['linked'] = r.linkedTotal || 0;
-    if(exam.components?.exam) obj['exam'] = r.compTotals.exam || 0;
+    if(exam.components?.cw1)     obj['cw1'] = r.compTotals.cw1 || 0;
+    if(exam.components?.cw2)     obj['cw2'] = r.compTotals.cw2 || 0;
+    if(linkedLabel)             obj['linked'] = r.linkedTotal || 0;
+    if(exam.components?.exam)   obj['exam'] = r.compTotals.exam || 0;
     obj['total'] = r.total;
     const sumMax = (r.subjects || []).reduce((a,s)=> a + (s.max || 0), 0) || 0;
     const percent = sumMax ? (Number(r.total) / sumMax * 100) : 0;
@@ -744,6 +756,7 @@ async function downloadPDF(rows, includeHeader=true){
   }
 
   doc.setFontSize(8);
+
   const autoCols = cols.map(c => ({ header: c.header, dataKey: c.dataKey }));
 
   const columnStyles = {};
@@ -753,7 +766,7 @@ async function downloadPDF(rows, includeHeader=true){
     else if(key === 'rank') columnStyles[key] = { cellWidth: 30 };
     else if(key === 'class') columnStyles[key] = { cellWidth: 60, halign: 'center' };
     else if(subjectDefs.find(sd => sd.name === key)) columnStyles[key] = { cellWidth: 40, halign: 'center' };
-    else if(['monthly','exam','linked','total','percent'].includes(key)) columnStyles[key] = { cellWidth: 50, halign: 'center' };
+    else if(['monthly','cw1','cw2','exam','linked','total','percent'].includes(key)) columnStyles[key] = { cellWidth: 50, halign: 'center' };
     else columnStyles[key] = { cellWidth: 'auto' };
   });
 
@@ -776,6 +789,7 @@ async function downloadPDF(rows, includeHeader=true){
   const fname = `${(exam.name||'exam').replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
 }
+
 
 
 // helper to fetch image and convert to dataURL
