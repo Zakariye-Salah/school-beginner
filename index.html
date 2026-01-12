@@ -195,9 +195,20 @@
       </div>
 
       <div class="modal-school">AL-FATXI PRIMARY AND SECONDARY SCHOOL — Ugu imow waxbarasho tayo leh</div>
-      <div class="celebration-actions">
-        <button id="celebrationCloseBtn" class="btn btn-ghost">Xir</button>
-      </div>
+   <!-- inside your celebrationModal, replace / update the actions area -->
+<div class="celebration-actions">
+  <!-- emoji toggle button (icon) -->
+  <button id="toggleEmojisBtn" class="btn" title="Show / Hide emojis" aria-pressed="true" style="min-width:48px">
+    <span id="toggleEmojisIcon">🎊</span>
+  </button>
+
+  <!-- close -->
+  <button id="celebrationCloseBtn" class="btn btn-ghost">Xir</button>
+</div>
+
+<!-- add a preloaded hidden audio element (near end of body, before your main.js) -->
+<audio id="clapAudio" src="assets/clap.mp3" preload="auto"></audio>
+
     </div>
   </div>
 
@@ -210,3 +221,4 @@
   <script type="module" src="main.js"></script>
 </body>
 </html>
+ 
