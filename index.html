@@ -156,12 +156,21 @@
       <label for="studentId">Geli ID-gaaga halkan</label>
       <div class="input-row" style="margin-top:6px">
         <input id="studentId" placeholder="STD042687284" />
-        <button id="toggleIdInputBtn" class="btn" title="Toggle ID input visibility" aria-label="Toggle ID input">
-          <!-- eye icon -->
-          <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/>
-            <circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/>
-          </svg>
+        <button id="toggleIdInputBtn" class="btn" title="Toggle ID input visibility" aria-label="Toggle ID input"
+        style="color:var(--primary); padding:6px 8px; background:transparent; border:1px solid rgba(11,116,255,0.06)">
+  <!-- eye (open) - shown by default -->
+  <svg id="toggleOpen" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;stroke:currentColor">
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.2" fill="none"/>
+  </svg>
+
+  <!-- eye (closed) - hidden by default -->
+  <svg id="toggleClosed" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;stroke:currentColor">
+    <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+  </svg>
+</button>
+          
         </button>
       </div>
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
