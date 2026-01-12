@@ -987,12 +987,15 @@ openAddExam.onclick = () => {
     <label style="margin-top:8px">Subjects (each has its own max)</label><div id="examSubjects">${subjHtml || '<div class="muted">No subjects</div>'}</div>
     <div style="margin-top:8px"><button id="toggleChkClasses" class="btn btn-ghost btn-sm">Uncheck All Classes</button></div>
     <label style="margin-top:8px">Classes</label><div id="examClasses">${classHtml || '<div class="muted">No classes</div>'}</div>
-    <div style="margin-top:8px">
-      <label><input type="checkbox" id="enableAssignment" /> Enable Assignment</label>
-      <label><input type="checkbox" id="enableQuiz" /> Enable Quiz</label>
-      <label><input type="checkbox" id="enableMonthly" /> Enable Monthly</label>
-      <label><input type="checkbox" id="enableExam" checked /> Enable Exam</label>
-    </div>
+  <div style="margin-top:8px">
+  <label><input type="checkbox" id="enableAssignment" /> Enable Assignment</label>
+  <label><input type="checkbox" id="enableQuiz" /> Enable Quiz</label>
+  <label><input type="checkbox" id="enableMonthly" /> Enable Monthly</label>
+  <label><input type="checkbox" id="enableCW1" /> Enable CW1</label>
+  <label><input type="checkbox" id="enableCW2" /> Enable CW2</label>
+  <label><input type="checkbox" id="enableExam" checked disabled /> Enable Exam</label>
+</div>
+
     <div style="margin-top:12px"><button id="saveExam" class="btn btn-primary">Create</button> <button id="cancelExam" class="btn btn-ghost">Cancel</button></div>
   `);
 
@@ -1138,13 +1141,22 @@ openAddExam.onclick = () => {
     const enableMonthly = Boolean(document.getElementById('enableMonthly').checked);
     const enableExam = Boolean(document.getElementById('enableExam').checked);
 
+          // force exam enabled & include cw1/cw2
+const enableCW1 = Boolean(document.getElementById('enableCW1').checked);
+const enableCW2 = Boolean(document.getElementById('enableCW2').checked);
+// always keep exam true (locked)
+const payloadComponents = { assignment: enableAssignment, quiz: enableQuiz, monthly: enableMonthly, cw1: enableCW1, cw2: enableCW2, exam: true };
     const payload = {
       name,
       date: date ? new Date(date) : null,
       status: 'draft',
       classes: chosenClasses,
       subjects: chosenSubjects,
-      components: { assignment: enableAssignment, quiz: enableQuiz, monthly: enableMonthly, exam: enableExam },
+      // components: { assignment: enableAssignment, quiz: enableQuiz, monthly: enableMonthly, exam: enableExam },
+
+
+components: payloadComponents,
+
       createdAt: Timestamp.now(),
       createdBy: currentUser.uid
     };
@@ -1228,12 +1240,16 @@ function openEditExamModal(e){
     <div style="margin-top:8px"><button id="toggleChkClasses" class="btn btn-ghost btn-sm">Toggle Classes</button></div>
     <label style="margin-top:8px">Classes</label><div id="examClasses" style="margin-top:6px">${classHtml || '<div class="muted">No classes</div>'}</div>
 
-    <div style="margin-top:8px">
-      <label><input type="checkbox" id="enableAssignment" ${ex.components?.assignment?'checked':''} /> Enable Assignment</label>
-      <label><input type="checkbox" id="enableQuiz" ${ex.components?.quiz?'checked':''} /> Enable Quiz</label>
-      <label><input type="checkbox" id="enableMonthly" ${ex.components?.monthly?'checked':''} /> Enable Monthly</label>
-      <label><input type="checkbox" id="enableExam" ${ex.components?.exam?'checked':''} /> Enable Exam</label>
-    </div>
+  <div style="margin-top:8px">
+  <label><input type="checkbox" id="enableAssignment" ${ex.components?.assignment?'checked':''} /> Enable Assignment</label>
+  <label><input type="checkbox" id="enableQuiz" ${ex.components?.quiz?'checked':''} /> Enable Quiz</label>
+  <label><input type="checkbox" id="enableMonthly" ${ex.components?.monthly?'checked':''} /> Enable Monthly</label>
+  <label><input type="checkbox" id="enableCW1" ${ex.components?.cw1?'checked':''} /> Enable CW1</label>
+  <label><input type="checkbox" id="enableCW2" ${ex.components?.cw2?'checked':''} /> Enable CW2</label>
+  <!-- exam locked -->
+  <label><input type="checkbox" id="enableExam" checked disabled /> Enable Exam</label>
+</div>
+
 
     <div style="margin-top:12px"><button id="saveExam" class="btn btn-primary">Save</button> <button id="cancelExam" class="btn btn-ghost">Cancel</button></div>
   `);
@@ -1362,14 +1378,18 @@ function openEditExamModal(e){
     const enableAssignment = Boolean(document.getElementById('enableAssignment').checked);
     const enableQuiz = Boolean(document.getElementById('enableQuiz').checked);
     const enableMonthly = Boolean(document.getElementById('enableMonthly').checked);
-    const enableExam = Boolean(document.getElementById('enableExam').checked);
+    const enableCW1 = Boolean(document.getElementById('enableCW1').checked);
+    const enableCW2 = Boolean(document.getElementById('enableCW2').checked);
+    // exam locked -> always true
+    const enableExam = true;
+    
 
     await updateDoc(doc(db,'exams',ex.id), {
       name,
       date: date ? new Date(date) : null,
       subjects: chosenSubjects,
       classes: chosenClasses,
-      components: { assignment: enableAssignment, quiz: enableQuiz, monthly: enableMonthly, exam: enableExam },
+      components: { assignment: enableAssignment, quiz: enableQuiz, monthly: enableMonthly, cw1: enableCW1, cw2: enableCW2, exam: enableExam },
       linkedExamId: linkedFrom || null
     });
     closeModal(); await loadExams(); renderExams(); populateStudentsExamDropdown(); toast('Exam updated');
@@ -1464,57 +1484,71 @@ async function publishExam(examId){
     let total = 0; let count = 0;
     const subs = [];
 
-    for(const sub of studentSubjectDefs){
-      // current exam part
-      let curSubTotal = 0;
-      let assignment = 0, quiz = 0, monthly = 0, paper = 0;
+    for (const sub of studentSubjectDefs) {
+      // current exam part (coerce to numeric defaults)
       const savedVal = marks[sub.name];
+      let assignment = 0, quiz = 0, monthly = 0, cw1 = 0, cw2 = 0, paper = 0;
+    
       if (typeof savedVal === 'number') {
-        curSubTotal = Number(savedVal);
-        paper = curSubTotal;
-      } else if (typeof savedVal === 'object' && savedVal !== null) {
+        paper = Number(savedVal || 0);
+      } else if (savedVal && typeof savedVal === 'object') {
         assignment = Number(savedVal.assignment || 0);
-        quiz = Number(savedVal.quiz || 0);
-        monthly = Number(savedVal.monthly || 0);
-        paper = Number(savedVal.exam || 0);
-        curSubTotal = assignment + quiz + monthly + paper;
+        quiz       = Number(savedVal.quiz || 0);
+        monthly    = Number(savedVal.monthly || 0);
+        cw1        = Number(savedVal.cw1 || 0);
+        cw2        = Number(savedVal.cw2 || 0);
+        paper      = Number(savedVal.exam || 0);
       } else {
-        // zero fill enabled components
+        // ensure zeros for configured components (keeps consistent shape)
         if (exam.components?.assignment) assignment = 0;
-        if (exam.components?.quiz) quiz = 0;
-        if (exam.components?.monthly) monthly = 0;
-        if (exam.components?.exam) paper = 0;
-        curSubTotal = assignment + quiz + monthly + paper;
+        if (exam.components?.quiz)       quiz = 0;
+        if (exam.components?.monthly)    monthly = 0;
+        if (exam.components?.cw1)        cw1 = 0;
+        if (exam.components?.cw2)        cw2 = 0;
+        if (exam.components?.exam)       paper = 0;
       }
-      // clamp to current exam max
-      const curMax = sub.max || 100;
-      if(curSubTotal > curMax) curSubTotal = curMax;
-
+    
+      // compute totals and clamp to subject max
+      const curMax = Number(sub.max || 100);
+      let curSubTotal = assignment + quiz + monthly + cw1 + cw2 + paper;
+      if (curSubTotal > curMax) curSubTotal = curMax;
+    
       // linked exam part (if any)
       let linkedPart = 0;
       let linkedMax = 0;
-      if(exam.linkedExamId){
-        linkedMax = (linkedSubjectsMeta[sub.name] || 0);
+      if (exam.linkedExamId) {
+        linkedMax = Number(linkedSubjectsMeta[sub.name] || 0);
         const linkedPerStudent = linkedTotalsCache[s.studentId] || {};
         linkedPart = Number(linkedPerStudent[sub.name] || 0);
       }
-
-      // combined total for this subject
+    
+      // combined total for this subject (bounded)
       const combinedTotal = Math.min(curSubTotal + linkedPart, (linkedMax + curMax) || 100);
-
-      // store components: include linked components under linkedComponents if available (we only have total by default)
+    
+      // build components object with safe numeric values (no undefined)
+      const compObj = {
+        assignment: Number(assignment || 0),
+        quiz:       Number(quiz || 0),
+        monthly:    Number(monthly || 0),
+        cw1:        Number(cw1 || 0),
+        cw2:        Number(cw2 || 0),
+        exam:       Number(paper || 0)
+      };
+      if (linkedPart > 0) {
+        compObj.linked = { total: Number(linkedPart), max: Number(linkedMax) };
+      }
+    
       subs.push({
         name: sub.name,
-        mark: combinedTotal,
-        max: (linkedMax + curMax) || 100,
-        components: { 
-          assignment, quiz, monthly, exam: paper,
-          linked: linkedPart > 0 ? { total: linkedPart, max: linkedMax } : undefined
-        }
+        mark: Number(Math.round(combinedTotal)),
+        max: Number((linkedMax + curMax) || 100),
+        components: compObj
       });
-      total += combinedTotal; count++;
+    
+      total += combinedTotal;
+      count++;
     }
-
+    
     const average = count ? (total / count) : 0;
     totals.push({ studentId: s.studentId, studentName: s.fullName, classId: s.classId, total, average, subjects: subs, motherName: s.motherName || '' });
   }
@@ -1531,27 +1565,58 @@ async function publishExam(examId){
 
   // write examTotals and studentsLatest
   const writes = [];
-  for(const t of totals){
+  for (const t of totals) {
     const examTotalsId = `${examId}_${t.studentId}`;
+  
+    // ensure components is a plain object with booleans (no undefined)
+    const safeComponents = Object.assign(
+      { assignment:false, quiz:false, monthly:false, cw1:false, cw2:false, exam:false },
+      (exam.components || {})
+    );
+  
+    // ensure subjects array exists and subject entries have safe numeric values
+    const safeSubjects = (t.subjects || []).map(s => {
+      const comps = s.components || {};
+      const safeComps = {
+        assignment: Number(comps.assignment || 0),
+        quiz:       Number(comps.quiz || 0),
+        monthly:    Number(comps.monthly || 0),
+        cw1:        Number(comps.cw1 || 0),
+        cw2:        Number(comps.cw2 || 0),
+        exam:       Number(comps.exam || 0)
+      };
+      if (comps.linked && typeof comps.linked.total !== 'undefined') {
+        safeComps.linked = { total: Number(comps.linked.total || 0), max: Number(comps.linked.max || 0) };
+      }
+      return {
+        name: s.name || '',
+        mark: Number(s.mark || 0),
+        max:  Number(s.max || 0),
+        components: safeComps
+      };
+    });
+  
     const payload = {
       examId,
-      examName: exam.name,
-      components: exam.components || {},
-      studentId: t.studentId,
-      studentName: t.studentName,
-      motherName: t.motherName || '',
-      classId: t.classId,
-      className: t.classId,
-      subjects: t.subjects,
-      total: t.total,
-      average: t.average,
-      classRank: t.classRank,
-      schoolRank: t.schoolRank,
+      examName: String(exam.name || ''),
+      components: safeComponents,
+      studentId: String(t.studentId || ''),
+      studentName: String(t.studentName || ''),
+      motherName: String(t.motherName || ''),
+      classId: String(t.classId || ''),
+      className: String(t.classId || ''),
+      subjects: safeSubjects,
+      total: Number(t.total || 0),
+      average: Number(t.average || 0),
+      classRank: Number(t.classRank || 0),
+      schoolRank: Number(t.schoolRank || 0),
       publishedAt: Timestamp.now()
     };
+  
     writes.push(setDoc(doc(db,'examTotals', examTotalsId), payload));
     writes.push(setDoc(doc(db,'studentsLatest', t.studentId), payload));
   }
+  
   writes.push(updateDoc(doc(db,'exams',examId), { status:'published', publishedAt: Timestamp.now() }));
   await Promise.all(writes);
 }
@@ -1700,7 +1765,10 @@ async function openStudentResultModalFor(student){
       if(comps.assignment) parts += `<label>Assignment (max ${s.max})</label><input id="res_${escape(s.name)}_assignment" type="number" min="0" />`;
       if(comps.quiz)       parts += `<label>Quiz (max ${s.max})</label><input id="res_${escape(s.name)}_quiz" type="number" min="0" />`;
       if(comps.monthly)    parts += `<label>Monthly (max ${s.max})</label><input id="res_${escape(s.name)}_monthly" type="number" min="0" />`;
+      if(comps.cw1)        parts += `<label>CW1 (max ${s.max})</label><input id="res_${escape(s.name)}_cw1" type="number" min="0" />`;
+      if(comps.cw2)        parts += `<label>CW2 (max ${s.max})</label><input id="res_${escape(s.name)}_cw2" type="number" min="0" />`;
       if(comps.exam)       parts += `<label>Exam (max ${s.max})</label><input id="res_${escape(s.name)}_exam" type="number" min="0" />`;
+      
 
       // show note about combined max if linked
       const combinedNote = ex.linkedExamId ? `<div style="font-size:0.85rem;color:#6b7280;margin-top:6px">Combined max for this subject = ${ (linkedMarksMap[s.name] && linkedMarksMap[s.name].components && typeof linkedMarksMap[s.name].components._max !== 'undefined') ? (Number(linkedMarksMap[s.name].components._max) + s.max) : '≤100' } (ensure combined ≤ 100)</div>` : '';
@@ -1716,19 +1784,36 @@ async function openStudentResultModalFor(student){
     // populate existing saved marks (current exam) and show linked marks (read-only already appended)
     const r = await getDoc(doc(db,'exams',ex.id,'results', student.studentId));
     const curMarks = r.exists() ? (r.data().marks || {}) : {};
-    for(const s of enabledSubjects){
-      const saved = curMarks[s.name];
-      if(typeof saved === 'number'){
-        const el = document.getElementById('res_'+s.name+'_exam') || document.getElementById('res_'+s.name+'_assignment');
-        if(el) el.value = String(saved);
-      } else if(typeof saved === 'object' && saved !== null){
-        ['assignment','quiz','monthly','exam'].forEach(comp=>{
+    for(const s of showSubjects){
+      const compObj = {};
+      let isObject = false;
+      let curSum = 0;
+      for(const comp of ['assignment','quiz','monthly','cw1','cw2','exam']){
+        if(ex.components?.[comp]){
           const el = document.getElementById('res_'+s.name+'_'+comp);
-          if(el) el.value = (saved[comp] != null) ? String(saved[comp]) : '';
-        });
+          const val = el && el.value ? Number(el.value) : 0;
+          if(val > s.max){ alert(`${s.name} maximum for this exam is ${s.max}`); return; }
+          compObj[comp] = val;
+          curSum += val;
+          isObject = true;
+        }
       }
-      // also, if we have linked marks we already displayed them above as read-only text
+      if(isObject) marks[s.name] = compObj;
+      else {
+        const el = document.getElementById('res_'+s.name+'_exam') || document.getElementById('res_'+s.name+'_assignment');
+        const val = el && el.value ? Number(el.value) : 0;
+        marks[s.name] = Math.min(Number(val), s.max);
+        curSum = Number(marks[s.name]);
+      }
+    
+      // validate combined with linked
+      const linkedVal = linkedMarksMap[s.name] ? Number(linkedMarksMap[s.name]) : 0;
+      if((linkedVal + curSum) > 100){
+        return alert(`Combined total for ${s.name} exceeds 100 (linked ${linkedVal} + current ${curSum}). Adjust values.`);
+      }
     }
+    
+
   }
 
   // onchange
