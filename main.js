@@ -423,23 +423,28 @@ async function renderResult(doc, opts = {}) {
 
   let compsEnabled = doc.components || null;
   if(!compsEnabled){
-    compsEnabled = { assignment:false, quiz:false, monthly:false, exam:false };
+    compsEnabled = { assignment:false, quiz:false, monthly:false, cw1:false, cw2:false, exam:false };
     if(Array.isArray(doc.subjects)) for(const s of doc.subjects){
       const c = s.components||{};
       if(c.assignment) compsEnabled.assignment = true;
       if(c.quiz) compsEnabled.quiz = true;
       if(c.monthly) compsEnabled.monthly = true;
+      if(c.cw1) compsEnabled.cw1 = true;
+      if(c.cw2) compsEnabled.cw2 = true;
       if(c.exam) compsEnabled.exam = true;
     }
   }
-
+  
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
   let tableHtml = `<div class="card"><div style="overflow:auto"><table><thead><tr><th>Subject</th>`;
   if(hasLinked) tableHtml += `<th>${twoLineHeaderHTML(doc.linkedExamName || 'Prev')}</th>`;
   if(compsEnabled.assignment) tableHtml += `<th>Assignment</th>`;
   if(compsEnabled.quiz) tableHtml += `<th>Quiz</th>`;
   if(compsEnabled.monthly) tableHtml += `<th>Monthly</th>`;
+  if(compsEnabled.cw1) tableHtml += `<th>CW1</th>`;
+  if(compsEnabled.cw2) tableHtml += `<th>CW2</th>`;
   if(compsEnabled.exam) tableHtml += `<th>${twoLineHeaderHTML(examName || 'Exam')}</th>`;
+  
   tableHtml += `<th>Total</th><th>Max</th></tr></thead><tbody>`;
 
   let totGot = 0, totMax = 0;
@@ -452,7 +457,10 @@ async function renderResult(doc, opts = {}) {
         if(comps.assignment != null) componentSum += Number(comps.assignment); else if(s.assignment != null) componentSum += Number(s.assignment);
         if(comps.quiz != null) componentSum += Number(comps.quiz); else if(s.quiz != null) componentSum += Number(s.quiz);
         if(comps.monthly != null) componentSum += Number(comps.monthly); else if(s.monthly != null) componentSum += Number(s.monthly);
+        if(comps.cw1 != null) componentSum += Number(comps.cw1); else if(s.cw1 != null) componentSum += Number(s.cw1);
+        if(comps.cw2 != null) componentSum += Number(comps.cw2); else if(s.cw2 != null) componentSum += Number(s.cw2);
         if(comps.exam != null) componentSum += Number(comps.exam); else if(s.exam != null) componentSum += Number(s.exam);
+        
       }
       const rowTotal = (typeof s.mark !== 'undefined') ? combinedMark : componentSum;
       const rowMax = Number(s.max || 0);
@@ -463,9 +471,12 @@ async function renderResult(doc, opts = {}) {
         tableHtml += `<td style="text-align:center">${escapeHtml(String(prevVal!=null?prevVal:'-'))}</td>`;
       }
       if(compsEnabled.assignment) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.assignment!=null)?comps.assignment:(s.assignment!=null? s.assignment: '-')))}</td>`;
-      if(compsEnabled.quiz) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.quiz!=null)?comps.quiz:(s.quiz!=null? s.quiz: '-')))}</td>`;
-      if(compsEnabled.monthly) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.monthly!=null)?comps.monthly:(s.monthly!=null? s.monthly: '-')))}</td>`;
-      if(compsEnabled.exam) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.exam!=null)?comps.exam:(s.exam!=null? s.exam: '-')))}</td>`;
+if(compsEnabled.quiz) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.quiz!=null)?comps.quiz:(s.quiz!=null? s.quiz: '-')))}</td>`;
+if(compsEnabled.monthly) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.monthly!=null)?comps.monthly:(s.monthly!=null? s.monthly: '-')))}</td>`;
+if(compsEnabled.cw1) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.cw1!=null)?comps.cw1:(s.cw1!=null? s.cw1: '-')))}</td>`;
+if(compsEnabled.cw2) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.cw2!=null)?comps.cw2:(s.cw2!=null? s.cw2: '-')))}</td>`;
+if(compsEnabled.exam) tableHtml += `<td style="text-align:center">${escapeHtml(String((comps.exam!=null)?comps.exam:(s.exam!=null? s.exam: '-')))}</td>`;
+
       tableHtml += `<td style="text-align:center">${escapeHtml(String(rowTotal))}</td><td style="text-align:center">${escapeHtml(String(rowMax||''))}</td></tr>`;
 
       totGot += Number(rowTotal||0); totMax += Number(rowMax||0);
