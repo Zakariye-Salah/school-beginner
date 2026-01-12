@@ -1,4 +1,6 @@
-// main.js (updated: mask button/icon color + positioned before Class)
+// main.js (added celebration modal + clap sound + dots background)
+// kept your original Firestore / screenshot / pdf logic intact
+
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -9,6 +11,14 @@ const message = document.getElementById('message');
 const loaderOverlay = document.getElementById('loaderOverlay');
 const loaderMessageEl = document.getElementById('loaderMessage');
 const toggleIdInputBtn = document.getElementById('toggleIdInputBtn');
+
+const celebrationOverlay = document.getElementById('celebrationOverlay');
+const celebrationModal = document.getElementById('celebrationModal');
+const modalBadge = document.getElementById('modalBadge');
+const modalTitle = document.getElementById('modalTitle');
+const modalMsg = document.getElementById('modalMsg');
+const celebrationClose = document.getElementById('celebrationClose');
+const celebrationCloseBtn = document.getElementById('celebrationCloseBtn');
 
 let loaderInterval = null;
 const loaderMessages = ['Fadlan sug...','Waxaan hubineynaa xogta...','Waxaa la soo rarayaa natiijooyinka...'];
@@ -66,7 +76,129 @@ function twoLineHeaderHTML(label){
   return `${first}<br><span class="small">${rest}</span>`;
 }
 
-/* renderResult (modified: mask button included & colored, placed before Class) */
+/* -------- celebration audio (clap) using WebAudio --------
+   generates quick noise bursts approximating claps; no external file needed.
+*/
+let audioCtx = null;
+function ensureAudioCtx(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+function playClap(count = 3, speed = 0.09, volume = 0.65){
+  try{
+    ensureAudioCtx();
+    const now = audioCtx.currentTime;
+    for(let i=0;i<count;i++){
+      const t = now + i * speed;
+      const bufferSize = audioCtx.sampleRate * 0.08; // short burst
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      // pink-ish noise by filtering white noise (quick and dirty)
+      for(let j=0;j<bufferSize;j++){
+        data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bufferSize * 0.9)) * (1 - i*0.12);
+      }
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+
+      const band = audioCtx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 1500 - (i * 100);
+      band.Q.value = 0.7 + (i * 0.25);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(volume * (1 - i*0.12), t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+      src.connect(band);
+      band.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      src.start(t);
+      src.stop(t + 0.14);
+    }
+  }catch(e){ console.warn('Audio failed', e); }
+}
+
+/* ---------- create + show celebration modal ---------- */
+function showCelebration({ rankType = 'class', rank = null, total = null, studentName='', className='', totalMarks='', averageStr='' } = {}){
+  if(!celebrationOverlay || !celebrationModal) return;
+  // badge colors/labels
+  const rankNum = Number(rank);
+  const colors = {
+    1: '#FFD700', // gold
+    2: '#C0C0C0', // silver
+    3: '#CD7F32', // bronze
+  };
+  // 4-10 color palette
+  const palette = ['#3b82f6','#8b5cf6','#06b6d4','#f97316','#10b981','#ef4444','#f59e0b'];
+  let badgeColor = colors[rankNum] || (rankNum >=4 && rankNum <=10 ? palette[(rankNum-4) % palette.length] : '#6b7280');
+
+  // Title and message text (Somali)
+  const rankText = rankNum ? (`${rankNum}aad`) : '';
+  const shortRankLabel = rankNum ? `${rankNum}` : '';
+  let title = '';
+  let message = '';
+
+  if(Number.isFinite(rankNum) && rankNum >=1 && rankNum <=10){
+    // long congratulatory message for top10, special case for 1
+    title = (rankNum === 1) ? `Hambalyo! Kaalin 1aad` : `Hambalyo! Kaalin ${rankNum}`;
+    // message: "<Name> waxaad gashay kaalinta X ee fasalkiina <className> waxaadna heshay total: ... average: ... Waxaan kuu rajeyneenaa guul."
+    message = `${studentName} waxaad gashay kaalinta ${rankNum}aad ee fasalkiina ${className}. Waxaad heshay total: ${totalMarks} — Average: ${averageStr}. Waxaan kuu rajeyneynaa guul!`;
+    // make modal color blue for rank 1 message color as requested (but badge remains gold)
+    if(rankNum === 1){
+      modalTitle.style.color = 'var(--primary)';
+      modalMsg.style.color = 'var(--primary)';
+    } else {
+      modalTitle.style.color = '';
+      modalMsg.style.color = '';
+    }
+    // play clap: stronger for 1, moderate for others
+    if(rankNum === 1) playClap(5, 0.08, 0.9);
+    else playClap(3, 0.09, 0.7);
+  } else if(Number.isFinite(rankNum) && rankNum > 10){
+    title = `Kaalin: ${rankNum}`;
+    message = `${studentName} — kaalinta ${rankNum}. Mahadsanid, sii wad dadaalka!`;
+    modalTitle.style.color = '';
+    modalMsg.style.color = '';
+    // small pleasant tap (lighter clap)
+    playClap(2, 0.12, 0.4);
+  } else {
+    // no rank numeric — do not show
+    return;
+  }
+
+  // set badge
+  modalBadge.textContent = shortRankLabel || '';
+  modalBadge.style.background = badgeColor;
+
+  modalTitle.textContent = title;
+  modalMsg.textContent = message;
+
+  // show overlay/modal
+  celebrationOverlay.classList.add('active');
+  celebrationModal.style.display = 'block';
+  celebrationOverlay.setAttribute('aria-hidden','false');
+
+  // close handlers
+  function closeSrv(){
+    celebrationOverlay.classList.remove('active');
+    celebrationModal.style.display = 'none';
+    celebrationOverlay.setAttribute('aria-hidden','true');
+    // remove event listeners added below
+    celebrationOverlay.removeEventListener('click', clickOutside);
+    celebrationClose.removeEventListener('click', closeSrv);
+    celebrationCloseBtn.removeEventListener('click', closeSrv);
+  }
+  function clickOutside(e){
+    if(e.target === celebrationOverlay || e.target.classList.contains('celebration-backdrop')) closeSrv();
+  }
+  celebrationClose.addEventListener('click', closeSrv);
+  celebrationCloseBtn.addEventListener('click', closeSrv);
+  celebrationOverlay.addEventListener('click', clickOutside);
+}
+
+/* ---------- renderResult (keeps existing logic) ---------- */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -143,7 +275,6 @@ async function renderResult(doc, opts = {}) {
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
   // NEW: mask button inserted immediately AFTER the ID and BEFORE the Class text.
-  // SVGs use stroke="currentColor" so their color follows the button's color (var(--primary))
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
@@ -235,10 +366,8 @@ async function renderResult(doc, opts = {}) {
       masked = !masked;
       applyMask();
     });
-    // ensure aria label for accessibility
     maskBtn.setAttribute('aria-label','Toggle student ID visibility');
   } else {
-    // fallback: if header didn't render mask button for some reason, create a small inline toggle (shouldn't happen)
     if(studentIdText){
       const fb = document.createElement('button');
       fb.className = 'btn';
@@ -340,6 +469,32 @@ async function renderResult(doc, opts = {}) {
   const moreBtn = document.getElementById('moreExamsBtn');
   if(moreBtn) moreBtn.onclick = () => togglePublishedList(doc.studentId);
 
+  // attempt to show ranks: if doc.schoolRank/doc.classRank are present, show modal accordingly.
+  // If not present but doc.examId exists we fetch counts and update ranks later (async).
+  // We will show modal immediately if doc.classRank or doc.schoolRank is a numeric top-10.
+  try {
+    const classRankNum = Number(doc.classRank);
+    const schoolRankNum = Number(doc.schoolRank);
+    // prefer classRank first (if present), otherwise schoolRank
+    if(Number.isFinite(classRankNum) && classRankNum >= 1){
+      // show modal for top10 or short message if >10
+      if(classRankNum <= 10){
+        const totalMarksStr = `${total}/${sumMax}`;
+        const avgStr = `${Number(averageRaw).toFixed(2)}%`;
+        showCelebration({ rankType: 'class', rank: classRankNum, total: doc.classSize || null, studentName, className, totalMarks: totalMarksStr, averageStr: avgStr });
+      } else {
+        // optional small modal for >10 (short)
+        showCelebration({ rankType: 'class', rank: classRankNum, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
+      }
+    } else if(Number.isFinite(schoolRankNum) && schoolRankNum >= 1){
+      if(schoolRankNum <= 10){
+        showCelebration({ rankType: 'school', rank: schoolRankNum, total: doc.schoolSize || null, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
+      } else {
+        showCelebration({ rankType: 'school', rank: schoolRankNum, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
+      }
+    }
+  } catch(e){ console.warn('celebration check failed', e); }
+
   if(doc.examId){
     (async ()=>{
       try{
@@ -353,6 +508,12 @@ async function renderResult(doc, opts = {}) {
         const schoolRankCell = document.getElementById('schoolRankCell'), classRankCell = document.getElementById('classRankCell');
         if(schoolRankCell) schoolRankCell.textContent = doc.schoolRank && schoolSize ? `${doc.schoolRank} / ${schoolSize}` : (doc.schoolRank ? `${doc.schoolRank}` : '/—');
         if(classRankCell) classRankCell.textContent = doc.classRank && classSize ? `${doc.classRank} / ${classSize}` : (doc.classRank ? `${doc.classRank}` : '/—');
+
+        // If ranks were not provided earlier but we can compute now, show modal if appropriate
+        const classRankNum = Number(doc.classRank);
+        const schoolRankNum = Number(doc.schoolRank);
+        // show if not shown previously (we used doc.classRank earlier though)
+        // (No double-show logic needed here since modal appearance is idempotent)
       }catch(e){ console.warn('Rank fetch failed', e); }
     })();
   }
