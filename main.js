@@ -1,5 +1,5 @@
-// main.js (added celebration modal + clap sound + dots background)
-// kept your original Firestore / screenshot / pdf logic intact
+// main.js — updated: allows custom audio file (from assets), falling confetti/dots, modal near top,
+// and Somali titles "Hambalyo! Kaalinta Xaad". Kept your Firestore/PDF/screenshot/mask logic intact.
 
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
@@ -19,6 +19,7 @@ const modalTitle = document.getElementById('modalTitle');
 const modalMsg = document.getElementById('modalMsg');
 const celebrationClose = document.getElementById('celebrationClose');
 const celebrationCloseBtn = document.getElementById('celebrationCloseBtn');
+const celebrationFall = document.getElementById('celebrationFall');
 
 let loaderInterval = null;
 const loaderMessages = ['Fadlan sug...','Waxaan hubineynaa xogta...','Waxaa la soo rarayaa natiijooyinka...'];
@@ -44,7 +45,7 @@ function gradeColor(g){
   if(g.startsWith('B')) return '#3b82f6'; if(g.startsWith('C')) return '#f59e0b'; return '#b91c1c';
 }
 
-/* input toggle before search (unchanged) */
+/* input toggle (unchanged) */
 (function wireInputToggleNow(){
   if(!toggleIdInputBtn || !studentIdInput) return;
   let hidden = false;
@@ -76,116 +77,163 @@ function twoLineHeaderHTML(label){
   return `${first}<br><span class="small">${rest}</span>`;
 }
 
-/* -------- celebration audio (clap) using WebAudio --------
-   generates quick noise bursts approximating claps; no external file needed.
+/* ---------- audio utilities ----------
+   playAudioFile(path) will try HTMLAudio (use for your custom file in assets/).
+   If it fails, we fallback to the synthesized clap (playClap).
 */
-let audioCtx = null;
+let audioFallbackCtx = null;
 function ensureAudioCtx(){
-  if(!audioCtx){
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if(!audioFallbackCtx){
+    audioFallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
 }
 function playClap(count = 3, speed = 0.09, volume = 0.65){
+  // quick synthetic clap (keeps previous behavior as fallback)
   try{
     ensureAudioCtx();
-    const now = audioCtx.currentTime;
+    const now = audioFallbackCtx.currentTime;
     for(let i=0;i<count;i++){
       const t = now + i * speed;
-      const bufferSize = audioCtx.sampleRate * 0.08; // short burst
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const bufferSize = audioFallbackCtx.sampleRate * 0.08;
+      const buffer = audioFallbackCtx.createBuffer(1, bufferSize, audioFallbackCtx.sampleRate);
       const data = buffer.getChannelData(0);
-      // pink-ish noise by filtering white noise (quick and dirty)
       for(let j=0;j<bufferSize;j++){
         data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bufferSize * 0.9)) * (1 - i*0.12);
       }
-      const src = audioCtx.createBufferSource();
+      const src = audioFallbackCtx.createBufferSource();
       src.buffer = buffer;
-
-      const band = audioCtx.createBiquadFilter();
+      const band = audioFallbackCtx.createBiquadFilter();
       band.type = 'bandpass';
       band.frequency.value = 1500 - (i * 100);
       band.Q.value = 0.7 + (i * 0.25);
-
-      const gain = audioCtx.createGain();
+      const gain = audioFallbackCtx.createGain();
       gain.gain.setValueAtTime(volume * (1 - i*0.12), t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-
       src.connect(band);
       band.connect(gain);
-      gain.connect(audioCtx.destination);
-
+      gain.connect(audioFallbackCtx.destination);
       src.start(t);
       src.stop(t + 0.14);
     }
-  }catch(e){ console.warn('Audio failed', e); }
+  }catch(e){ console.warn('Audio fallback failed', e); }
+}
+async function playAudioFile(path, fallbackFn){
+  if(!path) return fallbackFn && fallbackFn();
+  try{
+    const audio = new Audio(path);
+    audio.volume = 0.95;
+    // attempt to play; browsers may require user interaction — our call usually happens after a button click.
+    await audio.play();
+    // optionally stop later or leave to end
+    audio.addEventListener('error', ()=> { console.warn('Audio file error, falling back'); fallbackFn && fallbackFn(); });
+  }catch(err){
+    console.warn('Audio playback failed:', err);
+    fallbackFn && fallbackFn();
+  }
 }
 
-/* ---------- create + show celebration modal ---------- */
-function showCelebration({ rankType = 'class', rank = null, total = null, studentName='', className='', totalMarks='', averageStr='' } = {}){
+/* ---------- falling confetti/dots ---------- */
+function makeConfetti(count = 40){
+  if(!celebrationFall) return;
+  // clear old
+  celebrationFall.innerHTML = '';
+  const colors = ['#ffd700','#c0c0c0','#cd7f32','#3b82f6','#8b5cf6','#06b6d4','#f97316','#10b981','#ef4444','#f59e0b'];
+  const width = Math.max(window.innerWidth, 320);
+  for(let i=0;i<count;i++){
+    const el = document.createElement('span');
+    el.className = 'fall-dot';
+    const size = 6 + Math.floor(Math.random()*18); // 6-24px
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    const left = Math.random() * 110; // can start slightly off-screen
+    el.style.left = `${left}%`;
+    const tx = (Math.random()*80 - 40) + 'vw'; // horizontal drift
+    el.style.setProperty('--tx', tx);
+    const rot = (Math.random()*720 - 360) + 'deg';
+    el.style.setProperty('--rot', rot);
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    const duration = 2200 + Math.random()*2800; // 2.2s - 5s
+    const delay = Math.random()*600;
+    el.style.animationDuration = `${duration}ms`;
+    el.style.animationDelay = `${delay}ms`;
+    // blur and opacity randomization
+    el.style.filter = `blur(${Math.random()*2.5}px)`;
+    el.style.opacity = `${0.75 + Math.random()*0.25}`;
+    celebrationFall.appendChild(el);
+  }
+}
+function startConfettiThenStop(timeout = 4200){
+  // make and keep a batch (we'll remove on close)
+  makeConfetti(48);
+  // optionally create a second burst shortly
+  setTimeout(()=> makeConfetti(36), 450);
+  // after the timeout we'll gently fade (CSS not needed; we remove node)
+  setTimeout(()=> {
+    if(celebrationFall) celebrationFall.innerHTML = '';
+  }, Math.max(timeout, 4200));
+}
+
+/* ---------- create + show celebration modal ----------
+   Accepts options:
+     - rank: numeric rank
+     - soundPath: optional path to your downloaded clap sound (e.g. '/assets/clap.mp3')
+     - studentName, className, totalMarks, averageStr
+*/
+function ordinalSuffixSomali(n){
+  // simple suffix: "aad" after the number (user prefers 1aad, 2aad, etc.)
+  return `${n}aad`;
+}
+function showCelebration({ rankType = 'class', rank = null, total = null, studentName='', className='', totalMarks='', averageStr='', soundPath = '/assets/clap.mp3' } = {}){
   if(!celebrationOverlay || !celebrationModal) return;
-  // badge colors/labels
   const rankNum = Number(rank);
   const colors = {
-    1: '#FFD700', // gold
-    2: '#C0C0C0', // silver
-    3: '#CD7F32', // bronze
+    1: '#FFD700',
+    2: '#C0C0C0',
+    3: '#CD7F32'
   };
-  // 4-10 color palette
   const palette = ['#3b82f6','#8b5cf6','#06b6d4','#f97316','#10b981','#ef4444','#f59e0b'];
-  let badgeColor = colors[rankNum] || (rankNum >=4 && rankNum <=10 ? palette[(rankNum-4) % palette.length] : '#6b7280');
+  const badgeColor = colors[rankNum] || (rankNum>=4 && rankNum<=10 ? palette[(rankNum-4) % palette.length] : '#6b7280');
 
-  // Title and message text (Somali)
-  const rankText = rankNum ? (`${rankNum}aad`) : '';
-  const shortRankLabel = rankNum ? `${rankNum}` : '';
-  let title = '';
-  let message = '';
-
-  if(Number.isFinite(rankNum) && rankNum >=1 && rankNum <=10){
-    // long congratulatory message for top10, special case for 1
-    title = (rankNum === 1) ? `Hambalyo! Kaalin 1aad` : `Hambalyo! Kaalin ${rankNum}`;
-    // message: "<Name> waxaad gashay kaalinta X ee fasalkiina <className> waxaadna heshay total: ... average: ... Waxaan kuu rajeyneenaa guul."
-    message = `${studentName} waxaad gashay kaalinta ${rankNum}aad ee fasalkiina ${className}. Waxaad heshay total: ${totalMarks} — Average: ${averageStr}. Waxaan kuu rajeyneynaa guul!`;
-    // make modal color blue for rank 1 message color as requested (but badge remains gold)
-    if(rankNum === 1){
-      modalTitle.style.color = 'var(--primary)';
-      modalMsg.style.color = 'var(--primary)';
-    } else {
-      modalTitle.style.color = '';
-      modalMsg.style.color = '';
-    }
-    // play clap: stronger for 1, moderate for others
-    if(rankNum === 1) playClap(5, 0.08, 0.9);
-    else playClap(3, 0.09, 0.7);
-  } else if(Number.isFinite(rankNum) && rankNum > 10){
-    title = `Kaalin: ${rankNum}`;
-    message = `${studentName} — kaalinta ${rankNum}. Mahadsanid, sii wad dadaalka!`;
-    modalTitle.style.color = '';
-    modalMsg.style.color = '';
-    // small pleasant tap (lighter clap)
-    playClap(2, 0.12, 0.4);
-  } else {
-    // no rank numeric — do not show
+  if(!Number.isFinite(rankNum)){
     return;
   }
 
-  // set badge
-  modalBadge.textContent = shortRankLabel || '';
-  modalBadge.style.background = badgeColor;
+  // Title exact phrasing: "Hambalyo! Kaalinta {rank}aad"
+  const title = `Hambalyo! Kaalinta ${ordinalSuffixSomali(rankNum)}`;
+  let message = '';
+  if(rankNum >=1 && rankNum <=10){
+    message = `${studentName} waxaad gashay kaalinta ${rankNum}aad ee fasalkiina ${className}. Waxaad heshay total: ${totalMarks} — Average: ${averageStr}. Waxaan kuu rajeyneynaa guul!`;
+  } else {
+    message = `${studentName} — kaalinta ${rankNum}. Mahadsanid, sii wad dadaalka!`;
+  }
 
+  modalBadge.textContent = String(rankNum);
+  modalBadge.style.background = badgeColor;
   modalTitle.textContent = title;
   modalMsg.textContent = message;
 
-  // show overlay/modal
+  // show overlay + start confetti
   celebrationOverlay.classList.add('active');
   celebrationModal.style.display = 'block';
   celebrationOverlay.setAttribute('aria-hidden','false');
 
-  // close handlers
+  // create falling confetti and start
+  startConfettiThenStop();
+
+  // play provided sound (if exists) else fallback to synth clap
+  playAudioFile(soundPath, () => {
+    // fallback to synth— stronger for rank 1
+    if(rankNum === 1) playClap(5, 0.08, 0.9);
+    else if(rankNum <= 10) playClap(3, 0.09, 0.75);
+    else playClap(2, 0.12, 0.5);
+  });
+
+  // close handler
   function closeSrv(){
     celebrationOverlay.classList.remove('active');
     celebrationModal.style.display = 'none';
     celebrationOverlay.setAttribute('aria-hidden','true');
-    // remove event listeners added below
+    if(celebrationFall) celebrationFall.innerHTML = '';
     celebrationOverlay.removeEventListener('click', clickOutside);
     celebrationClose.removeEventListener('click', closeSrv);
     celebrationCloseBtn.removeEventListener('click', closeSrv);
@@ -198,7 +246,7 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
   celebrationOverlay.addEventListener('click', clickOutside);
 }
 
-/* ---------- renderResult (keeps existing logic) ---------- */
+/* ---------- renderResult (keeps your logic) ---------- */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -274,7 +322,7 @@ async function renderResult(doc, opts = {}) {
   const examLabel = escapeHtml(examName || '');
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
-  // NEW: mask button inserted immediately AFTER the ID and BEFORE the Class text.
+  // ID + mask button before class
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
@@ -283,14 +331,11 @@ async function renderResult(doc, opts = {}) {
 
         <div class="id-class-line">
           ID: <strong id="studentIdText">${studentIdRaw}</strong>
-          <!-- mask button placed BEFORE the Class -->
           <button id="maskIdBtn" class="btn" title="Toggle displayed ID" style="padding:6px 8px;margin-left:8px;color:var(--primary);background:transparent;border:1px solid rgba(11,116,255,0.08)">
-            <!-- eye-open (visible when unmasked) -->
             <svg id="eyeOpen" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;stroke:currentColor">
               <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
               <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.2" fill="none"/>
             </svg>
-            <!-- eye-closed (visible when masked) -->
             <svg id="eyeClosed" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;stroke:currentColor">
               <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
@@ -469,29 +514,19 @@ async function renderResult(doc, opts = {}) {
   const moreBtn = document.getElementById('moreExamsBtn');
   if(moreBtn) moreBtn.onclick = () => togglePublishedList(doc.studentId);
 
-  // attempt to show ranks: if doc.schoolRank/doc.classRank are present, show modal accordingly.
-  // If not present but doc.examId exists we fetch counts and update ranks later (async).
-  // We will show modal immediately if doc.classRank or doc.schoolRank is a numeric top-10.
+  // show celebration if rank present — prefer classRank, otherwise schoolRank
   try {
     const classRankNum = Number(doc.classRank);
     const schoolRankNum = Number(doc.schoolRank);
-    // prefer classRank first (if present), otherwise schoolRank
+    const totalMarksStr = `${total}/${sumMax}`;
+    const avgStr = `${Number(averageRaw).toFixed(2)}%`;
+    // allow user-supplied sound path via doc.soundPath (optional) or default '/assets/clap.mp3'
+    const soundPath = doc.soundPath || 'assets/clap.mp3';
+
     if(Number.isFinite(classRankNum) && classRankNum >= 1){
-      // show modal for top10 or short message if >10
-      if(classRankNum <= 10){
-        const totalMarksStr = `${total}/${sumMax}`;
-        const avgStr = `${Number(averageRaw).toFixed(2)}%`;
-        showCelebration({ rankType: 'class', rank: classRankNum, total: doc.classSize || null, studentName, className, totalMarks: totalMarksStr, averageStr: avgStr });
-      } else {
-        // optional small modal for >10 (short)
-        showCelebration({ rankType: 'class', rank: classRankNum, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
-      }
+      showCelebration({ rankType:'class', rank: classRankNum, studentName, className, totalMarks: totalMarksStr, averageStr: avgStr, soundPath });
     } else if(Number.isFinite(schoolRankNum) && schoolRankNum >= 1){
-      if(schoolRankNum <= 10){
-        showCelebration({ rankType: 'school', rank: schoolRankNum, total: doc.schoolSize || null, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
-      } else {
-        showCelebration({ rankType: 'school', rank: schoolRankNum, studentName, className, totalMarks: `${total}/${sumMax}`, averageStr: `${Number(averageRaw).toFixed(2)}%` });
-      }
+      showCelebration({ rankType:'school', rank: schoolRankNum, studentName, className, totalMarks: totalMarksStr, averageStr: avgStr, soundPath });
     }
   } catch(e){ console.warn('celebration check failed', e); }
 
@@ -508,12 +543,6 @@ async function renderResult(doc, opts = {}) {
         const schoolRankCell = document.getElementById('schoolRankCell'), classRankCell = document.getElementById('classRankCell');
         if(schoolRankCell) schoolRankCell.textContent = doc.schoolRank && schoolSize ? `${doc.schoolRank} / ${schoolSize}` : (doc.schoolRank ? `${doc.schoolRank}` : '/—');
         if(classRankCell) classRankCell.textContent = doc.classRank && classSize ? `${doc.classRank} / ${classSize}` : (doc.classRank ? `${doc.classRank}` : '/—');
-
-        // If ranks were not provided earlier but we can compute now, show modal if appropriate
-        const classRankNum = Number(doc.classRank);
-        const schoolRankNum = Number(doc.schoolRank);
-        // show if not shown previously (we used doc.classRank earlier though)
-        // (No double-show logic needed here since modal appearance is idempotent)
       }catch(e){ console.warn('Rank fetch failed', e); }
     })();
   }
