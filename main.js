@@ -1,3 +1,4 @@
+// main.js (updated: mask button/icon color + positioned before Class)
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -33,7 +34,7 @@ function gradeColor(g){
   if(g.startsWith('B')) return '#3b82f6'; if(g.startsWith('C')) return '#f59e0b'; return '#b91c1c';
 }
 
-/* input toggle before search */
+/* input toggle before search (unchanged) */
 (function wireInputToggleNow(){
   if(!toggleIdInputBtn || !studentIdInput) return;
   let hidden = false;
@@ -55,7 +56,7 @@ function gradeColor(g){
   });
 })();
 
-/* helper: format a header into two-line with small sublabel if it contains a space (mobile will show the small label) */
+/* helper for two-line header labels */
 function twoLineHeaderHTML(label){
   if(!label) return '';
   const parts = String(label).trim().split(/\s+/);
@@ -65,7 +66,7 @@ function twoLineHeaderHTML(label){
   return `${first}<br><span class="small">${rest}</span>`;
 }
 
-/* renderResult (header stacked lines + table + totals). Keeps screenshot & PDF logic intact. */
+/* renderResult (modified: mask button included & colored, placed before Class) */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -86,7 +87,6 @@ async function renderResult(doc, opts = {}) {
   }
 
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
-  // build table header with mobile-friendly two-line labels for Midterm/Final when applicable
   let tableHtml = `<div class="card"><div style="overflow:auto"><table><thead><tr><th>Subject</th>`;
   if(hasLinked) tableHtml += `<th>${twoLineHeaderHTML(doc.linkedExamName || 'Prev')}</th>`;
   if(compsEnabled.assignment) tableHtml += `<th>Assignment</th>`;
@@ -110,7 +110,6 @@ async function renderResult(doc, opts = {}) {
       const rowTotal = (typeof s.mark !== 'undefined') ? combinedMark : componentSum;
       const rowMax = Number(s.max || 0);
 
-      // subject row
       tableHtml += `<tr><td>${escapeHtml(s.name)}</td>`;
       if(hasLinked){
         const prevVal = (s.components && s.components.linked && (typeof s.components.linked.total !== 'undefined')) ? s.components.linked.total : (s.components && typeof s.components.linked === 'number' ? s.components.linked : '-');
@@ -143,13 +142,33 @@ async function renderResult(doc, opts = {}) {
   const examLabel = escapeHtml(examName || '');
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
-  // stacked header exactly as requested (7 lines). student name prefixed with "Magaca ardayga:"
+  // NEW: mask button inserted immediately AFTER the ID and BEFORE the Class text.
+  // SVGs use stroke="currentColor" so their color follows the button's color (var(--primary))
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
       <div class="result-header">
         <div class="student-line">Magaca ardayga: <span class="student-name">${studentName}</span></div>
-        <div class="id-class-line">ID: <strong id="studentIdText">${studentIdRaw}</strong> &nbsp;&nbsp; Class: <strong>${className}</strong></div>
+
+        <div class="id-class-line">
+          ID: <strong id="studentIdText">${studentIdRaw}</strong>
+          <!-- mask button placed BEFORE the Class -->
+          <button id="maskIdBtn" class="btn" title="Toggle displayed ID" style="padding:6px 8px;margin-left:8px;color:var(--primary);background:transparent;border:1px solid rgba(11,116,255,0.08)">
+            <!-- eye-open (visible when unmasked) -->
+            <svg id="eyeOpen" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;stroke:currentColor">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+            <!-- eye-closed (visible when masked) -->
+            <svg id="eyeClosed" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;stroke:currentColor">
+              <path d="M3 3l18 18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            </svg>
+          </button>
+
+          &nbsp;&nbsp; Class: <strong>${className}</strong>
+        </div>
+
         <div class="exam-line">Exam: <strong>${examLabel}</strong></div>
         ${mother ? `<div class="mother-line"><strong>Ina Hooyo:</strong> ${mother}</div>` : ''}
         <div class="published-line">Published: ${escapeHtml(published)}</div>
@@ -157,7 +176,6 @@ async function renderResult(doc, opts = {}) {
       </div>
     </div>`;
 
-  // totals: show inline items in one row (wrap only if needed)
   const totalsHtml = `
     <div class="totals-card card">
       <div class="totals-block">
@@ -195,25 +213,43 @@ async function renderResult(doc, opts = {}) {
   const eyeClosed = document.getElementById('eyeClosed');
   let masked = true;
   const originalId = studentIdText ? studentIdText.textContent : '';
+
   function applyMask(){
     if(!studentIdText) return;
     if(masked){
       const s = originalId || '';
       studentIdText.textContent = s.length>3 ? '*'.repeat(Math.max(0,s.length-3)) + s.slice(-3) : '*'.repeat(s.length);
-      if(eyeOpen) eyeOpen.style.display='none'; if(eyeClosed) eyeClosed.style.display='inline-block';
+      if(eyeOpen) eyeOpen.style.display='none';
+      if(eyeClosed) eyeClosed.style.display='inline-block';
+      if(maskBtn) maskBtn.style.color = 'var(--primary)';
     } else {
       studentIdText.textContent = originalId;
-      if(eyeOpen) eyeOpen.style.display='inline-block'; if(eyeClosed) eyeClosed.style.display='none';
+      if(eyeOpen) eyeOpen.style.display='inline-block';
+      if(eyeClosed) eyeClosed.style.display='none';
+      if(maskBtn) maskBtn.style.color = 'var(--primary)';
     }
   }
-  if(maskBtn){ maskBtn.addEventListener('click', ()=>{ masked = !masked; applyMask(); }); applyMask(); }
-  // If mask button not present, create a small toggle next to ID to preserve feature
-  if(studentIdText && !maskBtn){
-    const b = document.createElement('button');
-    b.className = 'btn'; b.style.padding = '6px 8px'; b.style.marginLeft = '8px'; b.title = 'Toggle displayed ID';
-    b.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/></svg>';
-    studentIdText.parentNode.appendChild(b);
-    b.addEventListener('click', ()=>{ masked = !masked; applyMask(); });
+
+  if(maskBtn){
+    maskBtn.addEventListener('click', ()=>{
+      masked = !masked;
+      applyMask();
+    });
+    // ensure aria label for accessibility
+    maskBtn.setAttribute('aria-label','Toggle student ID visibility');
+  } else {
+    // fallback: if header didn't render mask button for some reason, create a small inline toggle (shouldn't happen)
+    if(studentIdText){
+      const fb = document.createElement('button');
+      fb.className = 'btn';
+      fb.style.padding = '6px 8px';
+      fb.style.marginLeft = '8px';
+      fb.style.color = 'var(--primary)';
+      fb.title = 'Toggle displayed ID';
+      fb.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>';
+      studentIdText.parentNode.appendChild(fb);
+      fb.addEventListener('click', ()=>{ masked = !masked; applyMask(); });
+    }
   }
   applyMask();
 
