@@ -1,4 +1,3 @@
-// main.js (updated headerHtml block uses header-right & exam-line classes)
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -56,7 +55,17 @@ function gradeColor(g){
   });
 })();
 
-/* renderResult with header-right / exam-line classes (keeps rest identical) */
+/* helper: format a header into two-line with small sublabel if it contains a space (mobile will show the small label) */
+function twoLineHeaderHTML(label){
+  if(!label) return '';
+  const parts = String(label).trim().split(/\s+/);
+  if(parts.length <= 1) return escapeHtml(label);
+  const first = escapeHtml(parts[0]);
+  const rest = escapeHtml(parts.slice(1).join(' '));
+  return `${first}<br><span class="small">${rest}</span>`;
+}
+
+/* renderResult (header stacked lines + table + totals). Keeps screenshot & PDF logic intact. */
 async function renderResult(doc, opts = {}) {
   resultArea.style.display = 'block';
   resultArea.innerHTML = '';
@@ -77,12 +86,13 @@ async function renderResult(doc, opts = {}) {
   }
 
   const hasLinked = Boolean(doc.linkedExamName) || Boolean(doc.linkedExamId) || (Array.isArray(doc.subjects) && doc.subjects.some(s => s.components && s.components.linked));
+  // build table header with mobile-friendly two-line labels for Midterm/Final when applicable
   let tableHtml = `<div class="card"><div style="overflow:auto"><table><thead><tr><th>Subject</th>`;
-  if(hasLinked) tableHtml += `<th>${escapeHtml(doc.linkedExamName || 'Prev')}</th>`;
+  if(hasLinked) tableHtml += `<th>${twoLineHeaderHTML(doc.linkedExamName || 'Prev')}</th>`;
   if(compsEnabled.assignment) tableHtml += `<th>Assignment</th>`;
   if(compsEnabled.quiz) tableHtml += `<th>Quiz</th>`;
   if(compsEnabled.monthly) tableHtml += `<th>Monthly</th>`;
-  if(compsEnabled.exam) tableHtml += `<th>${escapeHtml(examName)}</th>`;
+  if(compsEnabled.exam) tableHtml += `<th>${twoLineHeaderHTML(examName || 'Exam')}</th>`;
   tableHtml += `<th>Total</th><th>Max</th></tr></thead><tbody>`;
 
   let totGot = 0, totMax = 0;
@@ -100,6 +110,7 @@ async function renderResult(doc, opts = {}) {
       const rowTotal = (typeof s.mark !== 'undefined') ? combinedMark : componentSum;
       const rowMax = Number(s.max || 0);
 
+      // subject row
       tableHtml += `<tr><td>${escapeHtml(s.name)}</td>`;
       if(hasLinked){
         const prevVal = (s.components && s.components.linked && (typeof s.components.linked.total !== 'undefined')) ? s.components.linked.total : (s.components && typeof s.components.linked === 'number' ? s.components.linked : '-');
@@ -132,44 +143,33 @@ async function renderResult(doc, opts = {}) {
   const examLabel = escapeHtml(examName || '');
   const mother = doc.motherName ? escapeHtml(doc.motherName) : '';
 
-  // headerHtml uses .header-right and .exam-line so CSS controls wrapping
+  // stacked header exactly as requested (7 lines). student name prefixed with "Magaca ardayga:"
   const headerHtml = `
     <div class="card">
       <div class="result-school">${schoolName}</div>
       <div class="result-header">
-        <div class="header-top">
-          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-            <div class="student-name">${studentName}</div>
-            <div class="meta-inline">
-              <div class="label">ID:</div>
-              <div id="studentIdText" style="font-weight:900">${studentIdRaw}</div>
-              <button id="maskIdBtn" class="btn" title="Toggle displayed ID" style="padding:6px 8px">
-                <svg id="eyeOpen" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/></svg>
-                <svg id="eyeClosed" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2"/><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="header-right">
-            <div class="class-line">Class: <strong style="font-weight:900">${className}</strong></div>
-            <div class="exam-line">Exam: <strong>${examLabel}</strong></div>
-          </div>
-        </div>
-
-        <div style="margin-top:6px">
-          ${mother ? `<div><strong>Ina Hooyo:</strong> ${mother}</div>` : ''}
-          <div style="margin-top:4px;color:var(--muted)">${escapeHtml('Published:')} ${escapeHtml(published)} &nbsp;&nbsp; Source: AL-Fatxi School</div>
-        </div>
+        <div class="student-line">Magaca ardayga: <span class="student-name">${studentName}</span></div>
+        <div class="id-class-line">ID: <strong id="studentIdText">${studentIdRaw}</strong> &nbsp;&nbsp; Class: <strong>${className}</strong></div>
+        <div class="exam-line">Exam: <strong>${examLabel}</strong></div>
+        ${mother ? `<div class="mother-line"><strong>Ina Hooyo:</strong> ${mother}</div>` : ''}
+        <div class="published-line">Published: ${escapeHtml(published)}</div>
+        <div class="source-line">Source: AL-Fatxi School</div>
       </div>
     </div>`;
 
+  // totals: show inline items in one row (wrap only if needed)
   const totalsHtml = `
     <div class="totals-card card">
       <div class="totals-block">
-        <div class="tot-line"><div>Total: <strong style="color:#246bff">${total}</strong> / <span style="color:green">${sumMax}</span></div><div style="margin-left:auto;color:${percentCol}">Percent: <strong>${percent.toFixed(2)}%</strong></div></div>
-        <div class="tot-line"><div>Average: <strong>${Number(averageRaw).toFixed(2)}</strong></div><div style="margin-left:auto">Grade: <span class="grade-badge" style="background:${gradeBg}">${grade}</span></div></div>
-        <div class="tot-line"><div>Status: <strong style="color:${percent>=50? '#0b8a3e':'#c0392b'}">${passfail}</strong></div></div>
-        <div class="tot-line"><div>School rank: <strong id="schoolRankCell">${escapeHtml(String(doc.schoolRank || '/—'))}</strong></div><div style="margin-left:auto">Class rank: <strong id="classRankCell">${escapeHtml(String(doc.classRank || '/—'))}</strong></div></div>
+        <div class="tot-line">
+          <div>Total: <strong style="color:#246bff">${total}</strong> / <span style="color:green">${sumMax}</span></div>
+          <div>Percent: <strong style="color:${percentCol}">${percent.toFixed(2)}%</strong></div>
+          <div>Average: <strong>${Number(averageRaw).toFixed(2)}</strong></div>
+          <div>Grade: <span class="grade-badge" style="background:${gradeBg}">${grade}</span></div>
+          <div>Status: <strong style="color:${percent>=50? '#0b8a3e':'#c0392b'}">${passfail}</strong></div>
+          <div>School rank: <strong id="schoolRankCell">${escapeHtml(String(doc.schoolRank || '/—'))}</strong></div>
+          <div>Class rank: <strong id="classRankCell">${escapeHtml(String(doc.classRank || '/—'))}</strong></div>
+        </div>
       </div>
 
       <div class="actions-group" id="actionsGroup">
@@ -207,8 +207,17 @@ async function renderResult(doc, opts = {}) {
     }
   }
   if(maskBtn){ maskBtn.addEventListener('click', ()=>{ masked = !masked; applyMask(); }); applyMask(); }
+  // If mask button not present, create a small toggle next to ID to preserve feature
+  if(studentIdText && !maskBtn){
+    const b = document.createElement('button');
+    b.className = 'btn'; b.style.padding = '6px 8px'; b.style.marginLeft = '8px'; b.title = 'Toggle displayed ID';
+    b.innerHTML = '<svg class="icon" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/></svg>';
+    studentIdText.parentNode.appendChild(b);
+    b.addEventListener('click', ()=>{ masked = !masked; applyMask(); });
+  }
+  applyMask();
 
-  /* screenshot */
+  /* screenshot (kept) */
   const screenshotBtn = document.getElementById('screenshotBtn');
   const actionsGroup = document.getElementById('actionsGroup');
   if(screenshotBtn){
@@ -230,7 +239,7 @@ async function renderResult(doc, opts = {}) {
     };
   }
 
-  /* PDF generation (unchanged, kept larger fonts as before) */
+  /* PDF generation (kept) */
   const printBtn = document.getElementById('printBtn');
   if(printBtn){
     printBtn.onclick = async () => {
@@ -407,4 +416,4 @@ searchBtn.onclick = async () => {
     console.error(err); message.textContent = 'Khalad ayaa dhacay. Fadlan isku day mar kale.'; hideLoader();
   }
 };
-export { renderResult }; // optional
+export { renderResult };
