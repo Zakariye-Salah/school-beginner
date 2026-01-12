@@ -62,7 +62,7 @@
     .dots .d:nth-child(2){animation-delay:.12s}.dots .d:nth-child(3){animation-delay:.24s}
     @keyframes jump{0%{transform:translateY(0)}25%{transform:translateY(-6px)}50%{transform:translateY(0)}}
 
-    /* Celebration overlay + falling dots/confetti */
+    /* Celebration overlay + falling emojis */
     .celebration-overlay{
       position:fixed; inset:0; display:none; align-items:flex-start; justify-content:center; z-index:1300;
       padding-top:5vh; /* keep modal near top */
@@ -74,26 +74,24 @@
     .celebration-fall {
       position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1295;
     }
-    .fall-dot {
-      position:absolute; top:-6%; width:10px; height:10px; border-radius:50%; opacity:0.95;
-      filter: blur(0.8px); transform:translate3d(0,0,0);
-      will-change: transform, opacity;
-      animation-name: fallSpin;
-      animation-iteration-count: 1;
-      animation-timing-function: linear;
+    .fall-emoji {
+      position:absolute; top:-6%; font-size:18px; will-change: transform, opacity; display:inline-block;
+      animation-name: fallSpin; animation-iteration-count: 1; animation-timing-function: linear;
+      opacity:0.95;
+      text-shadow:0 6px 18px rgba(0,0,0,0.08);
     }
-    @keyframes fallSpin {
-      to { transform: translate3d(var(--tx,0), 120vh, 0) rotate(var(--rot,0)); opacity: 0.9; }
-    }
+    @keyframes fallSpin { to { transform: translate3d(var(--tx,0), 120vh, 0) rotate(var(--rot,0)); opacity: 0.95; } }
 
     .celebration-modal{
       position:relative; z-index:1310; width:min(640px, 94%); max-width:720px;
       background:linear-gradient(180deg,#ffffff,#fbfdff); border-radius:14px; padding:18px; box-shadow:0 30px 80px rgba(2,6,23,0.38);
       text-align:center; font-weight:800;
     }
-    .modal-badge{ width:88px; height:88px; border-radius:999px; display:inline-grid; place-items:center; font-size:28px; font-weight:900; color:#fff; margin:0 auto 12px auto; box-shadow:0 8px 22px rgba(2,6,23,0.16) }
+    .modal-logo{ width:64px;height:64px; object-fit:contain; border-radius:8px; display:block; margin:0 auto 8px auto; }
+    .modal-badge{ width:88px; height:88px; border-radius:999px; display:inline-grid; place-items:center; font-size:28px; font-weight:900; color:#fff; margin:6px auto 12px auto; box-shadow:0 8px 22px rgba(2,6,23,0.16) }
     .modal-title{ font-size:1.18rem; margin:6px 0 4px 0 }
     .modal-msg{ font-size:0.98rem; color:var(--muted); font-weight:700; margin:6px 0 12px 0; line-height:1.35 }
+    .modal-school{ font-size:0.9rem; color:#0f172a; margin-top:6px; font-weight:800 }
     .modal-close{ position:absolute; right:12px; top:12px; background:transparent;border:0;font-size:18px;font-weight:900;color:var(--muted); cursor:pointer }
     .celebration-actions{ margin-top:8px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap }
 
@@ -153,9 +151,11 @@
     <div id="celebrationFall" class="celebration-fall" aria-hidden="true"></div>
     <div id="celebrationModal" class="celebration-modal" role="dialog" aria-modal="true" style="display:none">
       <button id="celebrationClose" class="modal-close" aria-label="Close">✕</button>
+      <img src="assets/logo.png" alt="AL-FATXI logo" class="modal-logo" onerror="this.style.display='none'"/>
       <div id="modalBadge" class="modal-badge">1</div>
       <div id="modalTitle" class="modal-title">Waxaad gashay kaalinta 1aad!</div>
-      <div id="modalMsg" class="modal-msg">Sufyaan Geedi waxaad gashay kaalinta 1aad ee fasalkiina — total: 1000/1200 average: 89% — waxaan kuu rajeyneenaa guul.</div>
+      <div id="modalMsg" class="modal-msg">Halkan fariinta modal-ka — waxa kuu diyaarsan.</div>
+      <div class="modal-school">AL-FATXI PRIMARY AND SECONDARY SCHOOL — Ugu imow waxbarasho tayo leh</div>
       <div class="celebration-actions">
         <button id="celebrationCloseBtn" class="btn btn-ghost">Xir</button>
       </div>
@@ -170,4 +170,3 @@
   <script type="module" src="main.js"></script>
 </body>
 </html>
- 
