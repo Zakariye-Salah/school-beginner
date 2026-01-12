@@ -186,17 +186,38 @@ async function playAudioFileIfEnabled(path, fallbackFn){
 /* ---------- Input toggle (unchanged) ---------- */
 (function wireInputToggleNow(){
   if(!toggleIdInputBtn || !studentIdInput) return;
+
+  // ensure the toggle button uses primary color (keeps icon colored)
+  try {
+    toggleIdInputBtn.style.color = 'var(--primary)';
+  } catch (e){ /* ignore if CSS var not present */ }
+
+  // find icons inside the button
+  const openIcon = toggleIdInputBtn.querySelector('#toggleOpen');
+  const closedIcon = toggleIdInputBtn.querySelector('#toggleClosed');
+
+  // initial state: visible (not hidden) -> show open icon, input type text
   let hidden = false;
+  studentIdInput.type = 'text';
+  if(openIcon) openIcon.style.display = 'inline-block';
+  if(closedIcon) closedIcon.style.display = 'none';
+
+  // click handler toggles mask and icon (and keeps button color)
   toggleIdInputBtn.addEventListener('click', () => {
     hidden = !hidden;
     studentIdInput.type = hidden ? 'password' : 'text';
-    if(hidden){
-      toggleIdInputBtn.innerHTML = `<svg id="toggleInputIcon" class="icon" ...>...</svg>`;
-    } else {
-      toggleIdInputBtn.innerHTML = `<svg id="toggleInputIcon" class="icon" ...>...</svg>`;
+
+    if(openIcon && closedIcon){
+      openIcon.style.display = hidden ? 'none' : 'inline-block';
+      closedIcon.style.display = hidden ? 'inline-block' : 'none';
     }
+
+    // keep primary color no matter what (prevents icon going white)
+    try { toggleIdInputBtn.style.color = 'var(--primary)'; } catch(e){}
+    toggleIdInputBtn.setAttribute('aria-pressed', String(hidden));
   });
 })();
+
 
 function gradeForPercent(p){
   if(p>=97) return 'A+'; if(p>=93) return 'A'; if(p>=90) return 'A-';
