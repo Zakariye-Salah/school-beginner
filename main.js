@@ -1,9 +1,9 @@
-// main.js — updated (full file)
-// Keeps your Firestore/PDF/screenshot/mask logic intact; adds audio toggle + continuous emoji rain + visual tweaks
-
+// main.js (updated)
+// Keep your firebase imports etc.
 import { db } from './firebase-config.js';
 import { doc, getDoc, getDocs, collection, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
+/* ---------- DOM refs ---------- */
 const searchBtn = document.getElementById('searchBtn');
 const studentIdInput = document.getElementById('studentId');
 const resultArea = document.getElementById('resultArea');
@@ -12,33 +12,191 @@ const loaderOverlay = document.getElementById('loaderOverlay');
 const loaderMessageEl = document.getElementById('loaderMessage');
 const toggleIdInputBtn = document.getElementById('toggleIdInputBtn');
 
-const audioToggleBtn = document.getElementById('audioToggleBtn'); // NEW: audio on/off control
-let audioEnabled = false; // default OFF as requested
+const audioToggleBtn = document.getElementById('audioToggleBtn');
+let audioEnabled = false;
 
 const celebrationOverlay = document.getElementById('celebrationOverlay');
 const celebrationModal = document.getElementById('celebrationModal');
-const modalBadge = document.getElementById('modalBadge');
-const modalTitle = document.getElementById('modalTitle');
-const modalMsg = document.getElementById('modalMsg');
 const celebrationClose = document.getElementById('celebrationClose');
 const celebrationCloseBtn = document.getElementById('celebrationCloseBtn');
 const celebrationFall = document.getElementById('celebrationFall');
 
-const toggleEmojisBtn = document.getElementById('toggleEmojisBtn'); // new: show/hide emoji button
+const toggleEmojisBtn = document.getElementById('toggleEmojisBtn');
 const toggleEmojisIcon = document.getElementById('toggleEmojisIcon');
 const clapAudioEl = document.getElementById('clapAudio'); // preloaded audio element
 
-// state for emoji visibility
 let emojisVisible = true;
 let lastEmojiType = 'celebrate';
 
-
+/* ---------- loader helpers ---------- */
 let loaderInterval = null;
 const loaderMessages = ['Fadlan sug...','Waxaan hubineynaa xogta...','Waxaa la soo rarayaa natiijooyinka...'];
-function showLoader(){ if(!loaderOverlay) return; loaderOverlay.style.display='flex'; let i=0; loaderMessageEl.textContent = loaderMessages[0]; if(loaderInterval) clearInterval(loaderInterval); loaderInterval = setInterval(()=>{ i=(i+1)%loaderMessages.length; loaderMessageEl.textContent = loaderMessages[i]; },2200); }
-function hideLoader(){ if(!loaderOverlay) return; loaderOverlay.style.display='none'; if(loaderInterval){ clearInterval(loaderInterval); loaderInterval=null } loaderMessageEl.textContent=''; }
+function showLoader(){
+  if(!loaderOverlay) return;
+  loaderOverlay.style.display='flex';
+  let i=0;
+  loaderMessageEl.textContent = loaderMessages[0];
+  if(loaderInterval) clearInterval(loaderInterval);
+  loaderInterval = setInterval(()=>{ i=(i+1)%loaderMessages.length; loaderMessageEl.textContent = loaderMessages[i]; },2200);
+}
+function hideLoader(){
+  if(!loaderOverlay) return;
+  loaderOverlay.style.display='none';
+  if(loaderInterval){ clearInterval(loaderInterval); loaderInterval=null; }
+  loaderMessageEl.textContent='';
+}
 
+/* ---------- small utilities (escape etc.) ---------- */
 function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c])); }
+
+/* ---------- Audio / unlock logic ---------- */
+/*
+  Notes:
+  - Browsers require a user gesture to allow .play() for audio. We attempt to 'unlock' by quickly playing+pausing the preloaded element
+    when the user clicks the audio toggle.
+  - We try clapAudioEl first; if it fails we try candidate paths; if all fail we use the synthesized fallback (playClap).
+*/
+
+let audioFallbackCtx = null;
+function ensureAudioCtx(){ if(!audioFallbackCtx) audioFallbackCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+async function tryUnlockAudio() {
+  try {
+    // Resume audio context if exists
+    if (audioFallbackCtx && audioFallbackCtx.state === 'suspended') {
+      await audioFallbackCtx.resume();
+    }
+    if (clapAudioEl) {
+      // Attempt quick play/pause to unlock playback
+      clapAudioEl.muted = true; // silent attempt
+      clapAudioEl.currentTime = 0;
+      try {
+        await clapAudioEl.play();
+        clapAudioEl.pause();
+        clapAudioEl.currentTime = 0;
+        clapAudioEl.muted = false;
+        console.info('Audio element unlocked by user gesture (silent play succeeded).');
+        return true;
+      } catch (err) {
+        clapAudioEl.muted = false;
+        console.warn('Silent unlock via clapAudioEl failed:', err);
+      }
+    }
+    return false;
+  } catch (e) {
+    console.warn('tryUnlockAudio error', e);
+    return false;
+  }
+}
+
+function playClap(count = 10, speed = 0.07, volume = 0.95){
+  try{
+    ensureAudioCtx();
+    const ctx = audioFallbackCtx;
+    const now = ctx.currentTime;
+    for(let i=0;i<count;i++){
+      const t = now + i * speed;
+      const bufferSize = Math.floor(ctx.sampleRate * 0.09);
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let j=0;j<bufferSize;j++){
+        data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bufferSize * 0.85)) * (1 - i*0.09);
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 1400 - (i * 70);
+      band.Q.value = 0.6 + (i * 0.14);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(volume * (1 - i*0.09), t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      src.connect(band);
+      band.connect(gain);
+      gain.connect(ctx.destination);
+      src.start(t);
+      src.stop(t + 0.22);
+    }
+  }catch(e){ console.warn('Audio fallback failed', e); }
+}
+
+async function tryPlayCandidates(candidates){
+  for(const url of candidates){
+    try{
+      const a = new Audio(url);
+      a.preload = 'auto';
+      a.muted = false;
+      // Some browsers will still block .play(); catch errors
+      await a.play();
+      // let it play a short time (or end quickly)
+      return true;
+    }catch(err){
+      // try next candidate
+      console.warn('candidate play failed for', url, err);
+    }
+  }
+  return false;
+}
+
+async function playAudioFileIfEnabled(path, fallbackFn){
+  
+  if(!audioEnabled) {
+    console.info('Audio disabled by user — skipping playback.');
+    return;
+  }
+
+  // 1) try preloaded audio element first
+  if (clapAudioEl) {
+    try {
+      clapAudioEl.pause();
+      clapAudioEl.currentTime = 0;
+      clapAudioEl.muted = false;
+      // set a reasonably loud volume but not max
+      try { clapAudioEl.volume = 0.95; } catch(e) {}
+      await clapAudioEl.play();
+      console.info('Played preloaded clapAudio element.');
+      return;
+    } catch(err) {
+      console.warn('Preloaded clapAudio element play failed:', err);
+      // fall through to try other options
+    }
+  }
+
+  // 2) try path candidates (if path provided)
+  if (path) {
+    const cleaned = String(path).replace(/^\.\//, '').replace(/^\/+/, '');
+    const candidates = [cleaned, '/' + cleaned, './' + cleaned];
+    try{
+      const ok = await tryPlayCandidates(candidates);
+      if(ok){
+        console.info('Played clap via Audio() candidate path.');
+        return;
+      }
+    }catch(e){
+      console.warn('tryPlayCandidates error', e);
+    }
+  }
+
+  // 3) fallback to synthesized clap
+  console.info('Falling back to synth clap.');
+  fallbackFn && fallbackFn();
+
+}
+
+/* ---------- Input toggle (unchanged) ---------- */
+(function wireInputToggleNow(){
+  if(!toggleIdInputBtn || !studentIdInput) return;
+  let hidden = false;
+  toggleIdInputBtn.addEventListener('click', () => {
+    hidden = !hidden;
+    studentIdInput.type = hidden ? 'password' : 'text';
+    if(hidden){
+      toggleIdInputBtn.innerHTML = `<svg id="toggleInputIcon" class="icon" ...>...</svg>`;
+    } else {
+      toggleIdInputBtn.innerHTML = `<svg id="toggleInputIcon" class="icon" ...>...</svg>`;
+    }
+  });
+})();
 
 function gradeForPercent(p){
   if(p>=97) return 'A+'; if(p>=93) return 'A'; if(p>=90) return 'A-';
@@ -56,41 +214,23 @@ function gradeColor(g){
   if(g==='A+') return '#0b8a3e'; if(g==='A') return '#26a64b'; if(g==='A-') return '#66d17a';
   if(g.startsWith('B')) return '#3b82f6'; if(g.startsWith('C')) return '#f59e0b'; return '#b91c1c';
 }
-
-/* input toggle (unchanged) */
-(function wireInputToggleNow(){
-  if(!toggleIdInputBtn || !studentIdInput) return;
-  let hidden = false;
-  toggleIdInputBtn.addEventListener('click', () => {
-    hidden = !hidden;
-    studentIdInput.type = hidden ? 'password' : 'text';
-    if(hidden){
-      toggleIdInputBtn.innerHTML = `
-        <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 3l18 18" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/>
-        </svg>`;
-    } else {
-      toggleIdInputBtn.innerHTML = `
-        <svg id="toggleInputIcon" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="#0f172a" stroke-width="1.2"/><circle cx="12" cy="12" r="3" stroke="#0f172a" stroke-width="1.2"/>
-        </svg>`;
-    }
-  });
-})();
-
-/* audio toggle wiring */
+/* ---------- audio toggle wiring ---------- */
 (function wireAudioToggle(){
   if(!audioToggleBtn) return;
+
   function render(){
-    audioToggleBtn.innerHTML = audioEnabled
-      ? '🔊 Audio: ON'
-      : '🔈 Audio: OFF';
+    audioToggleBtn.innerHTML = audioEnabled ? '🔊 Audio: ON' : '🔈 Audio: OFF';
     audioToggleBtn.setAttribute('aria-pressed', String(audioEnabled));
   }
-  audioToggleBtn.addEventListener('click', () => {
+
+  audioToggleBtn.addEventListener('click', async () => {
     audioEnabled = !audioEnabled;
     render();
+    if(audioEnabled){
+      // try to unlock with a user gesture (important for autoplay policies)
+      const unlocked = await tryUnlockAudio();
+      console.info('Audio unlocked?', unlocked);
+    }
   });
   render();
 })();
@@ -103,153 +243,39 @@ function twoLineHeaderHTML(label){
   const rest = escapeHtml(parts.slice(1).join(' '));
   return `${first}<br><span class="small">${rest}</span>`;
 }
-
-/* ---------- audio utilities ----------
-   - Tries multiple candidate paths
-   - If file can't be played, we fallback to a longer synthesized clap
-   - Plays audio only when audioEnabled === true
-*/
-let audioFallbackCtx = null;
-function ensureAudioCtx(){
-  if(!audioFallbackCtx){
-    audioFallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-}
-function playClap(count = 10, speed = 0.07, volume = 0.95){ // longer default clap
-  try{
-    ensureAudioCtx();
-    const now = audioFallbackCtx.currentTime;
-    for(let i=0;i<count;i++){
-      const t = now + i * speed;
-      const bufferSize = Math.floor(audioFallbackCtx.sampleRate * 0.09);
-      const buffer = audioFallbackCtx.createBuffer(1, bufferSize, audioFallbackCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for(let j=0;j<bufferSize;j++){
-        data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bufferSize * 0.85)) * (1 - i*0.09);
-      }
-      const src = audioFallbackCtx.createBufferSource();
-      src.buffer = buffer;
-      const band = audioFallbackCtx.createBiquadFilter();
-      band.type = 'bandpass';
-      band.frequency.value = 1400 - (i * 70);
-      band.Q.value = 0.6 + (i * 0.14);
-      const gain = audioFallbackCtx.createGain();
-      gain.gain.setValueAtTime(volume * (1 - i*0.09), t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-      src.connect(band);
-      band.connect(gain);
-      gain.connect(audioFallbackCtx.destination);
-      src.start(t);
-      src.stop(t + 0.22);
-    }
-  }catch(e){ console.warn('Audio fallback failed', e); }
-}
-
-async function tryPlayCandidates(candidates){
-  for(const url of candidates){
-    try{
-      const audio = new Audio(url);
-      audio.preload = 'auto';
-      await audio.play();
-      return true;
-    }catch(err){
-      // try next candidate
-    }
-  }
-  return false;
-}
-
-async function playAudioFileIfEnabled(path, fallbackFn){
-  if(!audioEnabled) return; // respect audio on/off default OFF
-
-  // Try the preloaded audio element first (simplest & most reliable)
-  if(clapAudioEl && clapAudioEl.src){
-    try{
-      // reset to start
-      clapAudioEl.currentTime = 0;
-      await clapAudioEl.play();
-      return;
-    }catch(err){
-      // If play() failed (browser blocked or file not available) — ignore and fall back
-      console.warn('clapAudio play failed:', err);
-    }
-  }
-
-  // If a path was passed, try it via Audio objects (keeps your candidate path logic)
-  if(path){
-    const cleaned = String(path).replace(/^\.\//, '').replace(/^\/+/, '');
-    const candidates = [cleaned, '/' + cleaned, './' + cleaned];
-    try{
-      const ok = await tryPlayCandidates(candidates);
-      if(ok) return;
-    }catch(e){
-      console.warn('tryPlayCandidates error', e);
-    }
-  }
-
-  // final fallback: synthesized clap
-  fallbackFn && fallbackFn();
-}
-
-
-/* ---------- continuous falling emoji (stars/hearts/moon) + sad emojis ----------
-   - continuous: a repeating burst runs until stopEmojiRain() is called (modal close)
-   - removed rainbow from celebrate set
-*/
+/* ---------- Emoji rain logic (unchanged, but lastEmojiType is set in showCelebration) ---------- */
 let emojiIntervalId = null;
 function createEmojiBurst(type='celebrate', count=32){
   if(!celebrationFall) return;
-  const celebrateSet = ['🎉','⭐','🌟','❤️','🌙','✨','💫','🎊','💥']; // removed 🌈
+  const celebrateSet = ['🎉','⭐','🌟','❤️','🌙','✨','💫','🎊','💥'];
   const sadSet = ['😢','😞','💔','😔','☁️','😓'];
   const set = (type === 'sad') ? sadSet : celebrateSet;
   for(let i=0;i<count;i++){
     const el = document.createElement('span');
     el.className = 'fall-emoji';
-    const emoji = set[Math.floor(Math.random()*set.length)];
-    el.textContent = emoji;
-    const size = 14 + Math.floor(Math.random()*44); // 14 - 58px
+    el.textContent = set[Math.floor(Math.random()*set.length)];
+    const size = 14 + Math.floor(Math.random()*44);
     el.style.fontSize = `${size}px`;
-    const left = (Math.random()*120) + '%';
-    el.style.left = left;
-    const tx = (Math.random()*120 - 60) + 'vw';
-    el.style.setProperty('--tx', tx);
-    const rot = (Math.random()*1080 - 540) + 'deg';
-    el.style.setProperty('--rot', rot);
+    el.style.left = (Math.random()*120) + '%';
+    el.style.setProperty('--tx', (Math.random()*120 - 60) + 'vw');
+    el.style.setProperty('--rot', (Math.random()*1080 - 540) + 'deg');
     const duration = 2400 + Math.random()*5600;
     const delay = Math.random()*900;
     el.style.animationDuration = `${duration}ms`;
     el.style.animationDelay = `${delay}ms`;
     el.style.opacity = `${0.8 + Math.random()*0.2}`;
     celebrationFall.appendChild(el);
-    // remove each element after its animation completes to prevent memory growth
     setTimeout(()=>{ try{ el.remove(); }catch(e){} }, duration + delay + 200);
   }
 }
+function startEmojiRain(type='celebrate'){ stopEmojiRain(); createEmojiBurst(type,48); emojiIntervalId = setInterval(()=> createEmojiBurst(type,36), 700); }
+function stopEmojiRain(){ if(emojiIntervalId){ clearInterval(emojiIntervalId); emojiIntervalId=null; } if(celebrationFall) celebrationFall.innerHTML = ''; }
 
-function startEmojiRain(type='celebrate'){
-  // clear existing
-  stopEmojiRain();
-  // create immediate burst
-  createEmojiBurst(type, 48);
-  // then repeat periodically until stopped
-  emojiIntervalId = setInterval(()=> createEmojiBurst(type, 36), 700);
-}
-
-function stopEmojiRain(){
-  if(emojiIntervalId){
-    clearInterval(emojiIntervalId);
-    emojiIntervalId = null;
-  }
-  if(celebrationFall) celebrationFall.innerHTML = '';
-}
-
-// toggle emoji rain when the user clicks the modal toggle button
 if(toggleEmojisBtn){
   toggleEmojisBtn.addEventListener('click', (e) => {
     emojisVisible = !emojisVisible;
     toggleEmojisBtn.setAttribute('aria-pressed', String(emojisVisible));
     if(emojisVisible){
-      // restart rain with the last used type (sad/celebrate)
       startEmojiRain(lastEmojiType || 'celebrate');
       if(toggleEmojisIcon) toggleEmojisIcon.textContent = '🎊';
     } else {
@@ -259,41 +285,32 @@ if(toggleEmojisBtn){
   });
 }
 
-// ensure lastEmojiType is updated when starting rain in showCelebration
-// (we'll set that below inside showCelebration)
-
-
-/* ---------- showCelebration ----------
-   - uses startEmojiRain() so falling continues until the modal is closed
-   - plays sound only if audioEnabled and only for the rank configured (rank === 10 currently)
-*/
+/* ---------- showCelebration (improved audio + emoji logic) ---------- */
 function ordinalSuffixSomali(n){ return `${n}aad`; }
 
-// Replace your existing showCelebration(...) with this function body
-// Improved showCelebration — replace the old function with this
 function showCelebration({ rankType = 'class', rank = null, total = null, studentName='', className='', totalMarks='', averageStr='', soundPath = 'assets/clap.mp3', percent = null, examLabel = '' } = {}) {
   if(!celebrationOverlay || !celebrationModal) return;
   const rankNum = Number(rank);
   const isFail = (typeof percent === 'number') ? (percent < 50) : false;
 
-  // colors
+  console.info('Attempting to play celebration audio — audioEnabled=', audioEnabled, 'rank=', rankNum);
+
+  // badge color...
   const colors = { 1:'#FFD700', 2:'#C0C0C0', 3:'#CD7F32' };
   const palette = ['#3b82f6','#8b5cf6','#06b6d4','#f97316','#10b981','#ef4444','#f59e0b'];
   const badgeColor = colors[rankNum] || (rankNum >=4 && rankNum <= 10 ? palette[(rankNum-4) % palette.length] : '#6b7280');
 
-  // compute basics
+  // compute totals/avg...
   const totalParts = String(totalMarks || (total!=null? `${total}/${''}` : '')).split('/');
   const totalGot = totalParts[0] || (total != null ? String(total) : '');
-  const totalMax = totalParts[1] || (typeof total === 'number' && typeof percent === 'number' && percent ? String(Math.round((total / percent) * 100)) : '');
+  const totalMax = totalParts[1] || '';
   const avgRaw = averageStr || (typeof percent === 'number' ? `${Number(percent).toFixed(2)}%` : '');
 
-  // grade inference if percent passed
   let gradeText = '';
   try { gradeText = (typeof percent === 'number') ? gradeForPercent(percent) : ''; } catch(e){ gradeText = ''; }
-
   const passfail = (typeof percent === 'number') ? (percent >= 50 ? 'Gudbay' : 'Dhacay') : '';
 
-  // DOM nodes
+  // DOM nodes (structured fields)
   const modalBadgeEl = document.getElementById('modalBadge');
   const modalTitleEl = document.getElementById('modalTitle');
   const modalMsgEl = document.getElementById('modalMsg');
@@ -304,91 +321,54 @@ function showCelebration({ rankType = 'class', rank = null, total = null, studen
   const modalGrade = document.getElementById('modalGrade');
   const modalStatus = document.getElementById('modalStatus');
 
-  // set badge and style
-  if(modalBadgeEl) { modalBadgeEl.textContent = Number.isFinite(rankNum) ? String(rankNum) : ''; modalBadgeEl.style.background = badgeColor; modalBadgeEl.classList.add('glow'); }
+  if(modalBadgeEl){ modalBadgeEl.textContent = Number.isFinite(rankNum) ? String(rankNum) : ''; modalBadgeEl.style.background = badgeColor; modalBadgeEl.classList.add('glow'); }
 
-  // Title: short, punchy — avoid repeating structured details
   if(modalTitleEl){
-    if(isFail){
-      modalTitleEl.textContent = `Waan ka xunahay, ${studentName || ''}`;
-    } else if(Number.isFinite(rankNum) && rankNum >= 1){
-      modalTitleEl.textContent = `Hambalyo! Kaalinta ${ordinalSuffixSomali(rankNum)}`;
-    } else {
-      modalTitleEl.textContent = examLabel ? `Natiijooyinka — ${examLabel}` : 'Natiijooyinka';
-    }
+    if(isFail) modalTitleEl.textContent = `Waan ka xunahay, ${studentName || ''}`;
+    else if(Number.isFinite(rankNum) && rankNum >= 1) modalTitleEl.textContent = `Hambalyo! Kaalinta ${ordinalSuffixSomali(rankNum)}`;
+    else modalTitleEl.textContent = examLabel ? `Natiijooyinka — ${examLabel}` : 'Natiijooyinka';
   }
 
   if(modalMsgEl){
-    // include student name + exam name and make subtitle blue
     const examPart = examLabel ? ` — Imtixaanka: ${examLabel}` : '';
-    if(isFail){
-      modalMsgEl.textContent = `${studentName || 'Arday'} — Ha quusan — nala soo xiriir si aan kuu caawinno haddii aad qabto dood.${examPart}`;
-    } else {
-      modalMsgEl.textContent = `${studentName || 'Arday'} — Soo Dhawoow Arday — waan kuu hambalyeynaynaa!${examPart}`;
-    }
-    // set subtitle color to blue
+    modalMsgEl.textContent = isFail
+      ? `${studentName || 'Arday'} — Ha quusan — nala soo xiriir si aan kuu caawinno haddii aad qabto dood.${examPart}`
+      : `${studentName || 'Arday'} — Soo Dhawoow Arday — waan kuu hambalyeynaynaa!${examPart}`;
     modalMsgEl.style.color = '#2563eb';
   }
-  
-  
 
-  // Fill structured fields (these present the full details — so we don't repeat a long sentence)
   if(modalStudentName) modalStudentName.textContent = studentName || '';
-  if(modalTotalGot){
-    modalTotalGot.textContent = totalGot || '';
-    modalTotalGot.classList.remove('total-blue','total-green','total-red');
-    modalTotalGot.classList.add('total-blue');
-  }
-  if(modalTotalMax){
-    modalTotalMax.textContent = totalMax || '';
-    modalTotalMax.classList.remove('total-blue','total-green','total-red');
-    modalTotalMax.classList.add('total-green');
-    // If equal or missing set red (edge-case)
-    if(modalTotalGot.textContent && modalTotalGot.textContent === modalTotalMax.textContent) {
-      modalTotalGot.classList.remove('total-blue'); modalTotalGot.classList.add('total-red');
-      modalTotalMax.classList.remove('total-green'); modalTotalMax.classList.add('total-red');
-    }
-  }
-  if(modalAverage){
-    modalAverage.textContent = avgRaw;
-    modalAverage.classList.remove('avg-green','avg-red');
-    if(typeof percent === 'number') modalAverage.classList.add(percent >= 50 ? 'avg-green' : 'avg-red');
-  }
-  if(modalGrade){
-    modalGrade.textContent = gradeText || '';
-    modalGrade.className = 'grade-badge';
-    try { modalGrade.style.background = gradeColor(gradeText) || '#3b82f6'; } catch(e){ modalGrade.style.background = '#3b82f6'; }
-  }
-  if(modalStatus){
-    modalStatus.textContent = passfail || '';
-    modalStatus.classList.remove('status-pass','status-fail');
-    if(typeof percent === 'number') modalStatus.classList.add(percent >= 50 ? 'status-pass' : 'status-fail');
-  }
+  if(modalTotalGot) { modalTotalGot.textContent = totalGot || ''; modalTotalGot.className = 'total-blue'; }
+  if(modalTotalMax) { modalTotalMax.textContent = totalMax || ''; modalTotalMax.className = 'total-green'; }
+  if(modalAverage) { modalAverage.textContent = avgRaw; modalAverage.className = (typeof percent === 'number' && percent < 50) ? 'avg-red' : 'avg-green'; }
+  if(modalGrade){ modalGrade.textContent = gradeText || ''; modalGrade.className = 'grade-badge'; try { modalGrade.style.background = gradeColor(gradeText) || '#3b82f6'; } catch(e){ modalGrade.style.background = '#3b82f6'; } }
+  if(modalStatus){ modalStatus.textContent = passfail || ''; modalStatus.className = (typeof percent === 'number' && percent < 50) ? 'status-fail' : 'status-pass'; }
 
-  // show modal with pop animation
+  // show modal
   celebrationOverlay.classList.add('active');
   celebrationModal.style.display = 'block';
-  // trigger pop animation by toggling class
-  celebrationModal.classList.remove('pop');
-  // force reflow so animation runs each time
-  void celebrationModal.offsetWidth;
-  celebrationModal.classList.add('pop');
+  celebrationModal.classList.remove('pop'); void celebrationModal.offsetWidth; celebrationModal.classList.add('pop');
   celebrationOverlay.setAttribute('aria-hidden','false');
 
   // emoji rain
- // emoji rain
-lastEmojiType = isFail ? 'sad' : 'celebrate';
-if(emojisVisible) startEmojiRain(lastEmojiType);
+  lastEmojiType = isFail ? 'sad' : 'celebrate';
+  if(emojisVisible) startEmojiRain(lastEmojiType);
+
+  // Try to unlock audio (best-effort). Then play if audio is enabled and not a fail.
+  (async () => {
+    try {
+      // Try to unlock using earlier user gesture (if any)
+      await tryUnlockAudio();
+    } catch(e) { /* ignore */ }
+
+    if (!isFail) {
+      // Play using preloaded file (or fallback synth) when audioEnabled is true
+      playAudioFileIfEnabled(soundPath, () => playClap(6, 0.06, 0.85));
+    }
+  })();
 
 
-  // play audio for certain ranks if enabled
-  if(!isFail && Number(rankNum) === 10){
-    playAudioFileIfEnabled(soundPath, () => playClap(10, 0.07, 0.95));
-  } else if(!isFail && Number(rankNum) === 1){
-    playAudioFileIfEnabled(soundPath, () => playClap(6, 0.06, 0.85));
-  }
-
-  // close handler
+  // close handlers
   function closeSrv(){
     celebrationOverlay.classList.remove('active');
     celebrationModal.style.display = 'none';
@@ -398,7 +378,6 @@ if(emojisVisible) startEmojiRain(lastEmojiType);
     celebrationOverlay.removeEventListener('click', clickOutside);
     celebrationClose.removeEventListener('click', closeSrv);
     celebrationCloseBtn.removeEventListener('click', closeSrv);
-    // remove glow after a short timeout to keep DOM clean
     if(modalBadgeEl) setTimeout(()=> modalBadgeEl.classList.remove('glow'), 300);
   }
   function clickOutside(e){
@@ -408,8 +387,6 @@ if(emojisVisible) startEmojiRain(lastEmojiType);
   celebrationCloseBtn.addEventListener('click', closeSrv);
   celebrationOverlay.addEventListener('click', clickOutside);
 }
-
-
 
 /* ---------- renderResult (keeps your logic) with visual tweaks */
 async function renderResult(doc, opts = {}) {
@@ -778,6 +755,9 @@ async function fallbackFindLatestExamTotal(studentId){
 
 /* ---------- main search click (unchanged flow) ---------- */
 searchBtn.onclick = async () => {
+  tryUnlockAudio().catch(()=>{});
+
+
   const studentId = studentIdInput.value.trim();
   message.textContent = '';
   resultArea.style.display = 'none'; resultArea.innerHTML = '';
