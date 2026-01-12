@@ -256,11 +256,20 @@ function renderTable(){
   let html = classHeaderHtml + `<table><thead><tr><th style="width:48px;text-align:center">Rank</th><th>ID</th><th>Name</th><th style="width:80px">Class</th>`;
   for(const sub of headerSubjects) html += `<th class="subject-header" title="${escapeHtml(sub.name)}">${escapeHtml(shortLabel(sub.name))}</th>`;
 
-  const comps = exam.components || {};
+// REPLACE occurrences of:
+// const comps = exam.components || {};
+// WITH:
+const comps = Object.assign({ assignment:false, quiz:false, monthly:false, exam:false, cw1:false, cw2:false }, (exam.components || {}));
+
+
   if(comps.assignment) html += `<th title="Assignment total">Assn</th>`;
   if(comps.quiz) html += `<th title="Quiz total">Quiz</th>`;
   if(comps.monthly) html += `<th title="Monthly total">Monthly</th>`;
-  // linked exam total column (single per-student column)
+  /* ADD CW1 & CW2 */
+  if(comps.cw1)     html += `<th title="CW1 total">CW1</th>`;
+  if(comps.cw2)     html += `<th title="CW2 total">CW2</th>`;
+  /* existing linked/exam columns follow */
+    // linked exam total column (single per-student column)
   if(exam.linkedExamId){
     html += `<th title="Linked exam total">${linkedLabel}</th>`;
   }
@@ -284,7 +293,10 @@ function renderTable(){
     if(comps.assignment) html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.assignment||0))}</td>`;
     if(comps.quiz) html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.quiz||0))}</td>`;
     if(comps.monthly) html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.monthly||0))}</td>`;
-    if(exam.linkedExamId) html += `<td style="text-align:center">${escapeHtml(String(r.linkedTotal||0))}</td>`;
+    /* ADD CW1 & CW2 cells */
+    if(comps.cw1)     html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.cw1||0))}</td>`;
+    if(comps.cw2)     html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.cw2||0))}</td>`;
+        if(exam.linkedExamId) html += `<td style="text-align:center">${escapeHtml(String(r.linkedTotal||0))}</td>`;
     if(comps.exam) html += `<td style="text-align:center">${escapeHtml(String(r.compTotals.exam||0))}</td>`;
 
     html += `<td style="text-align:center">${escapeHtml(String(r.total))}</td>`;
@@ -347,7 +359,13 @@ function renderTable(){
 */
 
 function computeTotalsForRows(studentsList, subjectDefs){
-  const comps = exam.components || {};
+  // const comps = exam.components || {};
+
+  const comps = Object.assign(
+    { assignment:false, quiz:false, monthly:false, cw1:false, cw2:false, exam:false },
+    (exam.components || {})
+  );
+  
   const arr = [];
 
   // build rows
@@ -357,7 +375,10 @@ function computeTotalsForRows(studentsList, subjectDefs){
     let total = 0;
     let count = 0;
     const subs = [];
-    const compTotals = { assignment:0, quiz:0, monthly:0, exam:0 };
+// REPLACE:
+// const compTotals = { assignment:0, quiz:0, monthly:0, exam:0 };
+// WITH:
+const compTotals = { assignment:0, quiz:0, monthly:0, cw1:0, cw2:0, exam:0 };
     let linkedTotal = 0;
 
     const subsToIterate = (subjectDefs && subjectDefs.length) ? subjectDefs : (exam.subjects || []);
@@ -369,25 +390,30 @@ function computeTotalsForRows(studentsList, subjectDefs){
       // current exam saved
       const saved = marks[subName];
       let markCur = 0;
-      let assignment=0, quiz=0, monthly=0, paper=0;
-
+      let assignment=0, quiz=0, monthly=0, cw1=0, cw2=0, paper=0;
+      
       if(typeof saved === 'number'){
         markCur = Number(saved);
         paper = markCur;
       } else if(typeof saved === 'object' && saved !== null){
         assignment = Number(saved.assignment || 0);
-        quiz = Number(saved.quiz || 0);
-        monthly = Number(saved.monthly || 0);
-        paper = Number(saved.exam || 0);
-        markCur = assignment + quiz + monthly + paper;
+        quiz       = Number(saved.quiz || 0);
+        monthly    = Number(saved.monthly || 0);
+        cw1        = Number(saved.cw1 || 0);
+        cw2        = Number(saved.cw2 || 0);
+        paper      = Number(saved.exam || 0);
+        markCur = assignment + quiz + monthly + cw1 + cw2 + paper;
       } else {
-        // missing saved -> use 0 for enabled components
+        // missing saved -> zeros for enabled components
         if(comps.assignment) assignment = 0;
-        if(comps.quiz) quiz = 0;
-        if(comps.monthly) monthly = 0;
-        if(comps.exam) paper = 0;
-        markCur = assignment + quiz + monthly + paper;
+        if(comps.quiz)       quiz = 0;
+        if(comps.monthly)    monthly = 0;
+        if(comps.cw1)        cw1 = 0;
+        if(comps.cw2)        cw2 = 0;
+        if(comps.exam)       paper = 0;
+        markCur = assignment + quiz + monthly + cw1 + cw2 + paper;
       }
+      
       if(markCur > max) markCur = max;
 
       // linked exam mark (if available) - default 0
@@ -402,9 +428,11 @@ function computeTotalsForRows(studentsList, subjectDefs){
 
       // component totals (current exam only)
       if(comps.assignment) compTotals.assignment += assignment;
-      if(comps.quiz) compTotals.quiz += quiz;
-      if(comps.monthly) compTotals.monthly += monthly;
-      if(comps.exam) compTotals.exam += paper;
+      if(comps.quiz)       compTotals.quiz += quiz;
+      if(comps.monthly)    compTotals.monthly += monthly;
+      if(comps.cw1)        compTotals.cw1 += cw1;
+      if(comps.cw2)        compTotals.cw2 += cw2;
+      if(comps.exam)       compTotals.exam += paper;
 
       subs.push({
         name: subName,
@@ -799,8 +827,14 @@ function openStudentEditor(student, exam){
 
     const enabledSubjects = (exam.subjects || []).filter(s => classSubjects.includes(s.name));
     const toShow = enabledSubjects;
-    const comps = exam.components || {};
+    // const comps = exam.components || {};
 
+    const comps = Object.assign(
+      { assignment:false, quiz:false, monthly:false, cw1:false, cw2:false, exam:false },
+      (exam.components || {})
+    );
+
+    
     let html = `<div><strong>${escapeHtml(student.fullName)}</strong> — ${escapeHtml(student.studentId)}<div style="margin-top:6px"><strong>Exam:</strong> ${escapeHtml(exam.name)}</div></div>`;
 
     if(!classSubjects.length){
@@ -832,7 +866,7 @@ function openStudentEditor(student, exam){
             for(const k of Object.keys(mm)){
               const v = mm[k];
               if(typeof v === 'number') linkedMarksForStudent[k] = Number(v);
-              else if(typeof v === 'object' && v !== null) linkedMarksForStudent[k] = (Number(v.assignment||0) + Number(v.quiz||0) + Number(v.monthly||0) + Number(v.exam||0));
+              else if(typeof v === 'object' && v !== null) linkedMarksForStudent[k] = (Number(v.assignment||0) + Number(v.quiz||0) + Number(v.monthly||0) + Number(v.cw1||0) + Number(v.cw2||0) +  Number(v.exam||0));
             }
           }
         } catch(e){
@@ -841,6 +875,7 @@ function openStudentEditor(student, exam){
       }
     }
 
+    
     html += `<form id="stuResForm" style="margin-top:10px"><div style="display:grid;gap:8px">`;
     for(const s of toShow){
       const sid = safeId(s.name);
@@ -852,16 +887,60 @@ function openStudentEditor(student, exam){
         <div style="display:flex;justify-content:space-between"><strong>${escapeHtml(s.name)}</strong><div style="font-size:0.85rem;color:#6b7280">Max ${max}</div></div>
         ${linkedNote}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">`;
-      if(comps.assignment) html += `<div><div class="compact-label">Assignment</div><input class="component-input" id="in_${sid}_assignment" type="number" min="0" /></div>`;
-      if(comps.quiz)       html += `<div><div class="compact-label">Quiz</div><input class="component-input" id="in_${sid}_quiz" type="number" min="0" /></div>`;
-      if(comps.monthly)    html += `<div><div class="compact-label">Monthly</div><input class="component-input" id="in_${sid}_monthly" type="number" min="0" /></div>`;
-      if(comps.exam)       html += `<div><div class="compact-label">Exam</div><input class="component-input" id="in_${sid}_exam" type="number" min="0" /></div>`;
+        // when generating each component input include data attributes for clamp logic
+        if(comps.assignment) html += `<div><div class="compact-label">Assignment</div><input class="component-input" id="in_${sid}_assignment" data-sub="${escapeHtml(s.name)}" data-comp="assignment" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+        if(comps.quiz)       html += `<div><div class="compact-label">Quiz</div><input class="component-input" id="in_${sid}_quiz" data-sub="${escapeHtml(s.name)}" data-comp="quiz" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+        if(comps.monthly)    html += `<div><div class="compact-label">Monthly</div><input class="component-input" id="in_${sid}_monthly" data-sub="${escapeHtml(s.name)}" data-comp="monthly" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+        if(comps.cw1)        html += `<div><div class="compact-label">CW1</div><input class="component-input" id="in_${sid}_cw1" data-sub="${escapeHtml(s.name)}" data-comp="cw1" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+        if(comps.cw2)        html += `<div><div class="compact-label">CW2</div><input class="component-input" id="in_${sid}_cw2" data-sub="${escapeHtml(s.name)}" data-comp="cw2" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+  
+        if(comps.exam)       html += `<div><div class="compact-label">Exam</div><input class="component-input" id="in_${sid}_exam" data-sub="${escapeHtml(s.name)}" data-comp="exam" data-max="${max}" data-linked="${linkedVal}" type="number" min="0" /></div>`;
+  
       html += `<div style="display:flex;flex-direction:column;justify-content:center"><div class="compact-label">Total</div><div id="preview_${sid}">0</div></div>`;
       html += `</div></div>`;
     }
     html += `</div><div style="margin-top:10px;display:flex;gap:8px"><button id="saveStudentRes" class="btn btn-primary">Save</button><button id="cancelStudentRes" type="button" class="btn btn-ghost">Cancel</button></div></form>`;
     stuModalBody.innerHTML = html;
 
+        // --- attach live clamp handlers for all newly created component inputs
+        (function attachClamps(){
+          const compNames = ['assignment','quiz','monthly','cw1','cw2','exam'];
+          const inputs = Array.from(document.querySelectorAll('#stuResForm .component-input'));
+          function clampAndPreview(el){
+            const sub = el.dataset.sub;
+            const comp = el.dataset.comp;
+            const max = Number(el.dataset.max || 100);
+            // sum other current component values
+            let sumOther = 0;
+            for(const name of compNames){
+              if(name === comp) continue;
+              const other = document.querySelector(`#stuResForm input[data-sub="${sub}"][data-comp="${name}"]`);
+              if(other && other.value) sumOther += Number(other.value || 0);
+            }
+            // allowed remaining for this field
+            const allowed = Math.max(0, max - sumOther);
+            if(Number(el.value || 0) > allowed){
+              el.value = String(allowed);
+            }
+            // update preview display for this subject
+            updatePreview(sub, max, exam);
+          }
+    
+          inputs.forEach(inp => {
+            // enforce numeric and clamp while typing
+            inp.addEventListener('input', (ev) => {
+              // ensure non-negative integer-ish value
+              if(ev.target.value === '') { updatePreview(ev.target.dataset.sub, Number(ev.target.dataset.max||100), exam); return; }
+              if(isNaN(Number(ev.target.value))) { ev.target.value = '0'; }
+              if(Number(ev.target.value) < 0) ev.target.value = '0';
+              clampAndPreview(ev.target);
+            }, { passive:false });
+    
+            // when created, call once to ensure preview shows current value
+            clampAndPreview(inp);
+          });
+        })();
+    
     // populate existing marks: only for the intersection subjects (toShow)
     const rSnap = await getDoc(doc(db,'exams', exam.id, 'results', student.studentId));
     const savedMarks = rSnap.exists() ? (rSnap.data().marks || {}) : {};
@@ -870,25 +949,28 @@ function openStudentEditor(student, exam){
       const sid = safeId(s.name);
       const v = savedMarks[s.name];
       if(typeof v === 'number'){
+        // previous format: whole-number stored — treat as exam
         const elExam = document.getElementById(`in_${sid}_exam`);
         if(elExam) elExam.value = String(v);
       } else if(typeof v === 'object' && v !== null){
-        for(const comp of ['assignment','quiz','monthly','exam']){
+        for(const comp of ['assignment','quiz','monthly','cw1','cw2','exam']){
           const el = document.getElementById(`in_${sid}_${comp}`);
           if(el) el.value = (v[comp] != null) ? String(v[comp]) : '';
         }
       }
       updatePreview(s.name, s.max || 100, exam);
     }
+    
 
     // listeners to update preview
     for(const s of toShow){
       const sid = safeId(s.name);
-      ['assignment','quiz','monthly','exam'].forEach(comp=>{
+      ['assignment','quiz','monthly','cw1','cw2','exam'].forEach(comp=>{
         const el = document.getElementById(`in_${sid}_${comp}`);
         if(el) el.oninput = ()=> updatePreview(s.name, s.max || 100, exam);
       });
     }
+    
 
     document.getElementById('cancelStudentRes').onclick = ()=> { stuModalBackdrop.style.display='none'; stuModalBody.innerHTML=''; };
     document.getElementById('saveStudentRes').onclick = async (ev) => {
@@ -901,7 +983,8 @@ function openStudentEditor(student, exam){
         let compObj = {};
         let isObject = false;
         let subTotal = 0;
-        for(const comp of ['assignment','quiz','monthly','exam']){
+        // include cw1 & cw2
+        for(const comp of ['assignment','quiz','monthly','cw1','cw2','exam']){
           if(!comps[comp]) continue;
           const el = document.getElementById(`in_${sid}_${comp}`);
           const val = el && el.value ? Number(el.value) : 0;
@@ -909,19 +992,32 @@ function openStudentEditor(student, exam){
           subTotal += val;
           isObject = true;
         }
-        if(subTotal > (s.max || 100)){
-          const examEl = document.getElementById(`in_${sid}_exam`);
-          const sumOther = subTotal - (examEl && examEl.value ? Number(examEl.value) : 0);
-          const allowedExam = Math.max(0, (s.max||100) - sumOther);
-          if(examEl){
-            examEl.value = String(Math.min(Number(examEl.value||0), allowedExam));
-            compObj.exam = Number(examEl.value||0);
-            subTotal = sumOther + compObj.exam;
+      
+        // If over subject max, reduce the last editable component (prefer exam -> cw2 -> cw1)
+        const subjectMax = (s.max || 100);
+        if(subTotal > subjectMax){
+          const lastTry = ['exam','cw2','cw1','monthly','quiz','assignment'];
+          const lastComp = lastTry.find(c => comps[c] && document.getElementById(`in_${sid}_${c}`));
+          if(lastComp){
+            const lastEl = document.getElementById(`in_${sid}_${lastComp}`);
+            const sumOther = subTotal - (lastEl && lastEl.value ? Number(lastEl.value) : 0);
+            const allowedLast = Math.max(0, subjectMax - sumOther);
+            if(lastEl){
+              lastEl.value = String(Math.min(Number(lastEl.value||0), allowedLast));
+              compObj[lastComp] = Number(lastEl.value||0);
+            }
+            // recompute subTotal after clamp
+            subTotal = Object.keys(compObj).reduce((acc,k)=> acc + (Number(compObj[k]||0)), 0);
           }
-          showToast(`${s.name} total limited to ${s.max || 100}`, 3000);
+          showToast(`${s.name} total limited to ${subjectMax}`, 3000);
         }
-        marks[s.name] = isObject ? compObj : Math.min(Number(document.getElementById(`in_${sid}_exam`)?.value||0), s.max || 100);
+      
+        // store either object (if components enabled) or a number fallback
+        if(isObject) marks[s.name] = compObj;
+        else marks[s.name] = Math.min(Number(document.getElementById(`in_${sid}_exam`)?.value||0), subjectMax);
       }
+      
+      
     
       // OPTIMISTIC UI: update local map and re-render immediately so the user sees instant feedback
       resultsMap[student.studentId] = marks;
@@ -972,28 +1068,45 @@ function openStudentEditor(student, exam){
 
 
 function updatePreview(subName, max, exam){
-  const comps = exam.components || {};
+  const comps = Object.assign(
+    { assignment:false, quiz:false, monthly:false, cw1:false, cw2:false, exam:false },
+    (exam.components || {})
+  );
   let total = 0;
   const sid = safeId(subName);
-  for(const comp of ['assignment','quiz','monthly','exam']){
-    if(!comps[comp]) continue;
+  // iterate enabled components including cw1/cw2
+  const compOrder = ['assignment','quiz','monthly','cw1','cw2','exam'];
+  const presentComps = compOrder.filter(c => comps[c]);
+
+  for(const comp of presentComps){
     const el = document.getElementById(`in_${sid}_${comp}`);
     const val = el && el.value ? Number(el.value) : 0;
     total += val;
   }
+
   if(total > max){
-    const lastComp = ['exam','monthly','quiz','assignment'].find(c => document.getElementById(`in_${sid}_${c}`) && document.getElementById(`in_${sid}_${c}`).value);
+    // try to find last changed component in this order (prefer exam then cw2,cw1,monthly,quiz,assignment)
+    const lastCompOrder = ['exam','cw2','cw1','monthly','quiz','assignment'];
+    const lastComp = lastCompOrder.find(c => presentComps.includes(c) && document.getElementById(`in_${sid}_${c}`) && document.getElementById(`in_${sid}_${c}`).value);
     if(lastComp){
       const lastEl = document.getElementById(`in_${sid}_${lastComp}`);
       const sumOther = total - (lastEl && lastEl.value ? Number(lastEl.value) : 0);
       const allowedLast = Math.max(0, max - sumOther);
       lastEl.value = String(Math.min(Number(lastEl.value||0), allowedLast));
-      total = sumOther + Number(lastEl.value||0);
-    } else total = max;
+      // recompute total
+      total = presentComps.reduce((acc,c) => {
+        const e = document.getElementById(`in_${sid}_${c}`);
+        return acc + (e && e.value ? Number(e.value) : 0);
+      }, 0);
+    } else {
+      total = max;
+    }
   }
+
   const preview = document.getElementById(`preview_${sid}`);
   if(preview) preview.textContent = String(total);
 }
+
 
 
 
@@ -1018,9 +1131,12 @@ function openPreviewModal(snapshot){
   html += `<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Subject</th>`;
   if(hasLinked) html += `<th>${escapeHtml(linkedLabel)}</th>`;
   if(compsEnabled.assignment) html += `<th>Assignment</th>`;
-  if(compsEnabled.quiz) html += `<th>Quiz</th>`;
-  if(compsEnabled.monthly) html += `<th>Monthly</th>`;
-  if(compsEnabled.exam) html += `<th>Exam</th>`;
+  if(compsEnabled.quiz)       html += `<th>Quiz</th>`;
+  if(compsEnabled.monthly)    html += `<th>Monthly</th>`;
+  if(compsEnabled.cw1)        html += `<th>CW1</th>`;
+  if(compsEnabled.cw2)        html += `<th>CW2</th>`;
+  if(compsEnabled.exam)       html += `<th>Exam</th>`;
+  
   html += `<th>Total</th><th>Max</th></tr></thead><tbody>`;
 
   let totGot = 0, totMax = 0;
@@ -1035,6 +1151,13 @@ function openPreviewModal(snapshot){
       else if(s.quiz != null) componentSum += Number(s.quiz);
       if(comps.monthly != null) componentSum += Number(comps.monthly);
       else if(s.monthly != null) componentSum += Number(s.monthly);
+
+      if(comps.cw1 != null) componentSum += Number(comps.cw1);
+else if(s.cw1 != null) componentSum += Number(s.cw1);
+if(comps.cw2 != null) componentSum += Number(comps.cw2);
+else if(s.cw2 != null) componentSum += Number(s.cw2);
+
+
       if(comps.exam != null) componentSum += Number(comps.exam);
       else if(s.exam != null) componentSum += Number(s.exam);
     }
@@ -1050,7 +1173,10 @@ function openPreviewModal(snapshot){
     if(compsEnabled.assignment) html += `<td style="text-align:center">${escapeHtml(comps.assignment != null ? String(comps.assignment) : (s.assignment != null ? String(s.assignment) : '-'))}</td>`;
     if(compsEnabled.quiz)       html += `<td style="text-align:center">${escapeHtml(comps.quiz != null ? String(comps.quiz) : (s.quiz != null ? String(s.quiz) : '-'))}</td>`;
     if(compsEnabled.monthly)    html += `<td style="text-align:center">${escapeHtml(comps.monthly != null ? String(comps.monthly) : (s.monthly != null ? String(s.monthly) : '-'))}</td>`;
+    if(compsEnabled.cw1)        html += `<td style="text-align:center">${escapeHtml(comps.cw1 != null ? String(comps.cw1) : (s.cw1 != null ? String(s.cw1) : '-'))}</td>`;
+    if(compsEnabled.cw2)        html += `<td style="text-align:center">${escapeHtml(comps.cw2 != null ? String(comps.cw2) : (s.cw2 != null ? String(s.cw2) : '-'))}</td>`;
     if(compsEnabled.exam)       html += `<td style="text-align:center">${escapeHtml(comps.exam != null ? String(comps.exam) : (s.exam != null ? String(s.exam) : '-'))}</td>`;
+    
 
     html += `<td style="text-align:center">${escapeHtml(String(rowTotal))}</td><td style="text-align:center">${escapeHtml(String(rowMax||''))}</td></tr>`;
 
@@ -1082,28 +1208,33 @@ function convertMarksToSubs(marks, exam, linkedMarks = {}) {
     let curTotal = 0;
 
     // populate component values (current exam)
-    if(typeof saved === 'number') {
-      if(compsEnabled && Object.keys(compsEnabled).length) {
-        if(compsEnabled.exam) comp.exam = Number(saved);
-        else comp.total = Number(saved);
-      } else {
-        comp.total = Number(saved);
-      }
-      curTotal = Number(saved);
-    } else if(typeof saved === 'object' && saved !== null) {
-      comp.assignment = Number(saved.assignment || 0);
-      comp.quiz = Number(saved.quiz || 0);
-      comp.monthly = Number(saved.monthly || 0);
-      comp.exam = Number(saved.exam || 0);
-      curTotal = (comp.assignment || 0) + (comp.quiz || 0) + (comp.monthly || 0) + (comp.exam || 0);
-    } else {
-      // no saved -> zeros for enabled components
-      if(compsEnabled.assignment) comp.assignment = 0;
-      if(compsEnabled.quiz) comp.quiz = 0;
-      if(compsEnabled.monthly) comp.monthly = 0;
-      if(compsEnabled.exam) comp.exam = 0;
-      curTotal = (comp.assignment || 0) + (comp.quiz || 0) + (comp.monthly || 0) + (comp.exam || 0);
-    }
+if(typeof saved === 'number') {
+  if(compsEnabled && Object.keys(compsEnabled).length) {
+    if(compsEnabled.exam) comp.exam = Number(saved);
+    else comp.total = Number(saved);
+  } else {
+    comp.total = Number(saved);
+  }
+  curTotal = Number(saved);
+} else if(typeof saved === 'object' && saved !== null) {
+  comp.assignment = Number(saved.assignment || 0);
+  comp.quiz       = Number(saved.quiz || 0);
+  comp.monthly    = Number(saved.monthly || 0);
+  comp.cw1        = Number(saved.cw1 || 0);
+  comp.cw2        = Number(saved.cw2 || 0);
+  comp.exam       = Number(saved.exam || 0);
+  curTotal = (comp.assignment || 0) + (comp.quiz || 0) + (comp.monthly || 0) + (comp.cw1 || 0) + (comp.cw2 || 0) + (comp.exam || 0);
+} else {
+  // no saved -> zeros for enabled components
+  if(compsEnabled.assignment) comp.assignment = 0;
+  if(compsEnabled.quiz) comp.quiz = 0;
+  if(compsEnabled.monthly) comp.monthly = 0;
+  if(compsEnabled.cw1) comp.cw1 = 0;
+  if(compsEnabled.cw2) comp.cw2 = 0;
+  if(compsEnabled.exam) comp.exam = 0;
+  curTotal = (comp.assignment || 0) + (comp.quiz || 0) + (comp.monthly || 0) + (comp.cw1 || 0) + (comp.cw2 || 0) + (comp.exam || 0);
+}
+
 
     // linked marks (if present)
     const linkedVal = Number(linkedMarks[name] || 0);
@@ -1148,6 +1279,10 @@ function escapeHtml(s){ if(s==null) return ''; return String(s).replace(/[&<>"']
 /* publishExamLocal - computes totals and writes examTotals + studentsLatest
    Uses per-student intersection: exam.subjects ∩ class.subjects
 */
+/* publishExamLocal - computes totals and writes examTotals + studentsLatest
+   Uses per-student intersection: exam.subjects ∩ class.subjects
+   Ensures no undefined values are written to Firestore and includes cw1/cw2.
+*/
 async function publishExamLocal(examIdToPublish){
   const exSnap = await getDoc(doc(db,'exams', examIdToPublish));
   if(!exSnap.exists()) throw new Error('Exam not found');
@@ -1168,19 +1303,16 @@ async function publishExamLocal(examIdToPublish){
 
   // if linked exam exists, prefetch its published examTotals and subject meta
   let linkedTotals = {}; // studentId -> { subjectName -> value }
-  const linkedSubjects = {};
+  const linkedSubjects = {}; // name -> max
   let linkedExamNameLocal = null;
   if(examDoc.linkedExamId){
     try {
-      // fetch linked exam doc for name + subject meta
       const linkedSnap = await getDoc(doc(db,'exams', examDoc.linkedExamId));
       if(linkedSnap.exists()){
         const linkedEx = linkedSnap.data();
         linkedExamNameLocal = linkedEx.name || linkedEx.linkedExamName || null;
         (linkedEx.subjects || []).forEach(s => linkedSubjects[s.name] = s.max || 0);
       }
-
-      // prefetch published examTotals for the linked exam (fast lookup)
       const q = query(collection(db,'examTotals'), where('examId','==', examDoc.linkedExamId));
       const snap = await getDocs(q);
       snap.forEach(d => {
@@ -1188,6 +1320,7 @@ async function publishExamLocal(examIdToPublish){
         const sid = data.studentId;
         if(!linkedTotals[sid]) linkedTotals[sid] = {};
         (data.subjects || []).forEach(s => {
+          // ensure numeric
           linkedTotals[sid][s.name] = Number(s.mark ?? s.total ?? 0);
         });
       });
@@ -1206,7 +1339,7 @@ async function publishExamLocal(examIdToPublish){
     const classDoc = classesMap[s.classId] || null;
     const classSubjectNames = classDoc && Array.isArray(classDoc.subjects) ? new Set(classDoc.subjects) : null;
 
-    // studentSubjectsDefs -> strict intersection preserving exam order; fallback to exam subjects if intersection empty
+    // studentSubjectsDefs -> strict intersection preserving exam order; fallback to exam subjects
     let studentSubjectsDefs;
     if(classSubjectNames){
       studentSubjectsDefs = (examDoc.subjects || []).filter(sd => classSubjectNames.has(sd.name));
@@ -1221,26 +1354,33 @@ async function publishExamLocal(examIdToPublish){
     const subs = [];
 
     for(const sub of studentSubjectsDefs){
-      // current exam part
+      // current exam part (include cw1/cw2)
       let curSubTotal = 0;
-      let assignment = 0, quiz = 0, monthly = 0, paper = 0;
+      let assignment = 0, quiz = 0, monthly = 0, cw1 = 0, cw2 = 0, paper = 0;
       const savedVal = marks[sub.name];
       if (typeof savedVal === 'number'){
-        curSubTotal = Number(savedVal);
-        paper = curSubTotal;
+        // legacy numeric -> treat as exam score
+        paper = Number(savedVal);
+        curSubTotal = paper;
       } else if (typeof savedVal === 'object' && savedVal !== null){
         assignment = Number(savedVal.assignment || 0);
-        quiz = Number(savedVal.quiz || 0);
-        monthly = Number(savedVal.monthly || 0);
-        paper = Number(savedVal.exam || 0);
-        curSubTotal = assignment + quiz + monthly + paper;
+        quiz       = Number(savedVal.quiz || 0);
+        monthly    = Number(savedVal.monthly || 0);
+        cw1        = Number(savedVal.cw1 || 0);
+        cw2        = Number(savedVal.cw2 || 0);
+        paper      = Number(savedVal.exam || 0);
+        curSubTotal = assignment + quiz + monthly + cw1 + cw2 + paper;
       } else {
+        // components enabled -> treat missing as zero
         if (examDoc.components?.assignment) assignment = 0;
-        if (examDoc.components?.quiz) quiz = 0;
-        if (examDoc.components?.monthly) monthly = 0;
-        if (examDoc.components?.exam) paper = 0;
-        curSubTotal = assignment + quiz + monthly + paper;
+        if (examDoc.components?.quiz)       quiz = 0;
+        if (examDoc.components?.monthly)    monthly = 0;
+        if (examDoc.components?.cw1)        cw1 = 0;
+        if (examDoc.components?.cw2)        cw2 = 0;
+        if (examDoc.components?.exam)       paper = 0;
+        curSubTotal = assignment + quiz + monthly + cw1 + cw2 + paper;
       }
+
       const curMax = sub.max || 100;
       if(curSubTotal > curMax) curSubTotal = curMax;
 
@@ -1252,17 +1392,27 @@ async function publishExamLocal(examIdToPublish){
         linkedPart = Number(linkedForStudent[sub.name] || 0);
       }
 
-      // combined
+      // combined (capped to linkedMax + curMax)
       const combinedTotal = Math.min(curSubTotal + linkedPart, (linkedMax + curMax) || 100);
+
+      // build components object using definite numeric values (no undefined)
+      const componentsObj = {
+        assignment: Number(assignment || 0),
+        quiz: Number(quiz || 0),
+        monthly: Number(monthly || 0),
+        cw1: Number(cw1 || 0),
+        cw2: Number(cw2 || 0),
+        exam: Number(paper || 0)
+      };
+      if(linkedPart > 0){
+        componentsObj.linked = { total: Number(linkedPart), max: Number(linkedMax || 0) };
+      }
 
       subs.push({
         name: sub.name,
-        mark: combinedTotal,
-        max: (linkedMax + curMax) || 100,
-        components: {
-          assignment, quiz, monthly, exam: paper,
-          linked: linkedPart ? { total: linkedPart, max: linkedMax } : undefined
-        }
+        mark: Number(Math.round(combinedTotal)),
+        max: Number((linkedMax + curMax) || 100),
+        components: componentsObj
       });
 
       total += combinedTotal; count++;
@@ -1274,8 +1424,8 @@ async function publishExamLocal(examIdToPublish){
       studentName: s.fullName,
       motherName: s.motherName || '',
       classId: s.classId,
-      total,
-      average,
+      total: Number(Math.round(total)),
+      average: Number(Number(average).toFixed(2)),
       subjects: subs
     });
   }
@@ -1302,26 +1452,27 @@ async function publishExamLocal(examIdToPublish){
   const writes = [];
   for(const t of totals){
     const examTotalsId = `${examIdToPublish}_${t.studentId}`;
+
+    // Build payload with only definite numeric values (avoid undefined)
     const payload = {
       examId: examIdToPublish,
-      examName: examDoc.name,
-      // include linked exam info so public/student view can show proper label
+      examName: examDoc.name || '',
       linkedExamId: examDoc.linkedExamId || null,
-      // prefer explicit linkedExamName on exam doc, else use fetched local name, else null
       linkedExamName: examDoc.linkedExamId ? (examDoc.linkedExamName || linkedExamNameLocal || null) : null,
       components: examDoc.components || {},
       studentId: t.studentId,
-      studentName: t.studentName,
+      studentName: t.studentName || '',
       motherName: t.motherName || '',
-      classId: t.classId,
-      className: t.classId,
-      subjects: t.subjects,
-      total: t.total,
-      average: t.average,
-      classRank: t.classRank,
-      schoolRank: t.schoolRank,
+      classId: t.classId || '',
+      className: t.classId || '',
+      subjects: t.subjects || [],
+      total: Number(t.total || 0),
+      average: Number(t.average || 0),
+      classRank: Number(t.classRank || 0),
+      schoolRank: Number(t.schoolRank || 0),
       publishedAt: Timestamp.now()
     };
+
     writes.push(setDoc(doc(db,'examTotals', examTotalsId), payload));
     writes.push(setDoc(doc(db,'studentsLatest', t.studentId), payload));
   }
@@ -1336,12 +1487,12 @@ async function publishExamLocal(examIdToPublish){
     }
     writes.push(updateDoc(doc(db,'exams',examIdToPublish), examUpdate));
   } catch(e){
-    // fallback: still update status in case the update above failed to queue
     writes.push(updateDoc(doc(db,'exams',examIdToPublish), { status:'published', publishedAt: Timestamp.now() }));
   }
 
   await Promise.all(writes);
 }
+
 
 
 
